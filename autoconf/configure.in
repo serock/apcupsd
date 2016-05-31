@@ -71,7 +71,7 @@ if test "$cross_compiling" = "no" ; then
 fi
 
 dnl Special considerations when cross-compiling for win32
-if test "$host_os" == "mingw32" ; then
+if test "$host_os" = "mingw32" ; then
    if test -z "$CROSSTOOLS" ; then 
       CROSSTOOLS=${topdir}/../cross-tools
    fi
@@ -229,9 +229,6 @@ AC_CHECK_FUNCS(
 dnl Optional on all builds
 dnl We will provide our own implementations if needed
 AC_CHECK_FUNCS(snprintf vsnprintf strlcpy strlcat accept4)
-
-AC_SEARCH_LIBS(pthread_setname_np, [pthread], AC_DEFINE(HAVE_PTHREAD_SETNAME_NP, 1,
-   [Define if you have the pthread_setname_np function.]),)
 
 dnl Mandatory except for WIN32 builds where we provide our own
 if test "$host_os" != "mingw32" ; then
@@ -581,29 +578,15 @@ AC_HELP_STRING([--disable-usb], [No USB UPS code (default)])],
          usbhost=$host
       fi
 
-      dnl Also force generic_usb if this is FreeBSD 8.0 or newer
-      case $usbhost in 
-         *-*-freebsd*)
-            tmp=`uname -r`
-            if test ${tmp%%.*} -ge 8 ; then
-               usbhost=forcegeneric
-            fi
-            ;;
-      esac
+      AC_DEFINE(HAVE_USB_DRIVER,, [Define if building USB driver])
+      USB_DRIVER="usb"
+      AC_SUBST(USB_DRIVER)
+      APCDRVLIBS="$APCDRVLIBS \$(topdir)/src/drivers/usb/libusbdrv.a"
 
       case $usbhost in
          *-*-linux*)
             USB_TYPE="linux"
             AC_MSG_RESULT([Using Linux USB driver.])
-            ;;
-         *-*-freebsd* | *-*-openbsd* | *-*-netbsd*)
-            LIBUSBHIDINC="-I\$(topdir)/src/libusbhid"
-            LIBUSBHID=libusbhid
-            APCDRVLIBS="$APCDRVLIBS \$(topdir)/src/libusbhid/libusbhid.a"
-            AC_SUBST(LIBUSBHID)
-            AC_SUBST(LIBUSBHIDINC)
-            USB_TYPE="bsd"
-            AC_MSG_RESULT([Using BSD USB driver.])
             ;;
          *)
             needlibusb=true
@@ -611,12 +594,7 @@ AC_HELP_STRING([--disable-usb], [No USB UPS code (default)])],
             ;;
       esac
 
-      AC_DEFINE(HAVE_USB_DRIVER,, [Define if building USB driver])
-      USB_DRIVER="usb"
-      AC_SUBST(USB_DRIVER)
       AC_SUBST(USB_TYPE)
-      APCDRVLIBS="$APCDRVLIBS \$(topdir)/src/drivers/usb/libusbdrv.a"
-
       DISPLAY_USB_DRIVER=$USB_TYPE-$USB_DRIVER
      fi ],
     [])
@@ -950,7 +928,7 @@ AC_ARG_WITH(distname,
 if test "x$DISTNAME" != "x"
 then
    echo "distname set to $DISTNAME"
-elif test "$host_os" == "mingw32" ; then
+elif test "$host_os" = "mingw32" ; then
    DISTNAME=mingw
 elif test $HAVE_UNAME=yes -a x`uname -s` = xOSF1
 then
@@ -1235,7 +1213,10 @@ darwin)
    PIDDIR=/var/run
    LOCKDIR=/var/tmp
    DFILES="\
-      platforms/darwin/apccontrol"
+      platforms/darwin/apccontrol \
+      platforms/darwin/apcupsd-start \
+      platforms/darwin/apcupsd-uninstall \
+      platforms/darwin/org.apcupsd.apcupsd.plist"
    ;;
 qnx)
    PTHREAD_LFLAGS=""

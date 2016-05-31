@@ -11,8 +11,8 @@ install-darwin:
 	$(call MKDIR,/Library/LaunchDaemons)
 	$(call INSTDATA,644,org.apcupsd.apcupsd.plist,/Library/LaunchDaemons)
 	-$(V)chown root:wheel $(DESTDIR)/Library/LaunchDaemons/org.apcupsd.apcupsd.plist
-	$(call INSTDATA,755,apcupsd-uninstall,/sbin)
-	$(call INSTDATA,755,apcupsd-start,/sbin)
+	$(call INSTDATA,755,apcupsd-uninstall,$(sbindir))
+	$(call INSTDATA,755,apcupsd-start,$(sbindir))
 	@echo "================================================="
 	@echo " "
 	@echo "apcupsd script installation for MacOS X (Darwin) complete." 
@@ -38,13 +38,16 @@ install-darwin:
 	@echo "================================================="
 
 install-usb:
-	$(call MKDIR,/System/Library/Extensions/ApcupsdDummy.kext/Contents)
-	-$(V)chown root:wheel $(DESTDIR)/System/Library/Extensions/ApcupsdDummy.kext
-	-$(V)chown root:wheel $(DESTDIR)/System/Library/Extensions/ApcupsdDummy.kext/Contents
+	$(call MKDIR,/System/Library/Extensions/ApcupsdDummy.kext/Contents/_CodeSignature)
+	-$(V)$(call INSTDATA,644,ApcupsdDummy.kext/Contents/Info.plist,/System/Library/Extensions/ApcupsdDummy.kext/Contents/Info.plist)
+	-$(V)$(call INSTDATA,644,ApcupsdDummy.kext/Contents/_CodeSignature/CodeDirectory,/System/Library/Extensions/ApcupsdDummy.kext/Contents/_CodeSignature/CodeDirectory)
+	-$(V)$(call INSTDATA,644,ApcupsdDummy.kext/Contents/_CodeSignature/CodeRequirements,/System/Library/Extensions/ApcupsdDummy.kext/Contents/_CodeSignature/CodeRequirements)
+	-$(V)$(call INSTDATA,644,ApcupsdDummy.kext/Contents/_CodeSignature/CodeResources,/System/Library/Extensions/ApcupsdDummy.kext/Contents/_CodeSignature/CodeResources)
+	-$(V)$(call INSTDATA,644,ApcupsdDummy.kext/Contents/_CodeSignature/CodeSignature,/System/Library/Extensions/ApcupsdDummy.kext/Contents/_CodeSignature/CodeSignature)
 	-$(V)chmod 755 $(DESTDIR)/System/Library/Extensions/ApcupsdDummy.kext
 	-$(V)chmod 755 $(DESTDIR)/System/Library/Extensions/ApcupsdDummy.kext/Contents
-	$(call INSTDATA,644,Info.plist,/System/Library/Extensions/ApcupsdDummy.kext/Contents)
-	-$(V)chown root:wheel $(DESTDIR)/System/Library/Extensions/ApcupsdDummy.kext/Contents/Info.plist
+	-$(V)chmod 755 $(DESTDIR)/System/Library/Extensions/ApcupsdDummy.kext/Contents/_CodeSignature
+	-$(V)chown -R root:wheel $(DESTDIR)/System/Library/Extensions/ApcupsdDummy.kext
 	$(call UNINST,/System/Library/Extensions.mkext)
 	$(call UNINST,/System/Library/Extensions.kextcache)
 	@echo "================================================="
@@ -60,8 +63,8 @@ uninstall-darwin:
 	-$(call UNINST,/System/Library/Extensions/ApcupsdDummy.kext)
 	-$(call UNINST,/System/Library/Extensions.mkext)
 	-$(call UNINST,/System/Library/Extensions.kextcache)
-	-$(call UNINST,/sbin/apcupsd-uninstall)
-	-$(call UNINST,/sbin/apcupsd-start)
+	-$(call UNINST,$(sbindir)/apcupsd-uninstall)
+	-$(call UNINST,$(sbindir)/apcupsd-start)
 	-$(call UNINST,/Library/LaunchDaemons/org.apcupsd.apcupsd.plist)
 	@echo "================================================="
 	@echo " "
@@ -87,7 +90,7 @@ PKGKEY := $(shell \
       | grep "common name" | cut -d\" -f2)
 
 # Loose executables to sign
-EXES := sbin/apcupsd sbin/apcaccess sbin/apctest sbin/smtp
+EXES := $(sbindir)/apcupsd $(sbindir)/apcaccess $(sbindir)/apctest $(sbindir)/smtp
 
 # Make apcupsd installation package
 apcupsd.pkg:

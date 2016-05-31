@@ -30,14 +30,6 @@ static pthread_t thread_id[MAX_THREADS];
 static const char *thread_name[MAX_THREADS];
 static int num_threads = 0;
 
-// FreeBSD uses PTHREAD_MAX_NAMELEN_NP so we will standardize on that
-#if defined(HAVE_PTHREAD_SETNAME_NP) && !defined(PTHREAD_MAX_NAMELEN_NP)
- // Linux has a max thread name length of 16 but no constant for it
- #ifdef __linux__
-  #define PTHREAD_MAX_NAMELEN_NP 16
- #endif
-#endif
-
 /* Start a "real" POSIX thread */
 int start_thread(UPSINFO *ups, void (*action) (UPSINFO * ups),
    const char *proctitle, char *argv0)
@@ -52,16 +44,6 @@ int start_thread(UPSINFO *ups, void (*action) (UPSINFO * ups),
          strerror(status));
       return 0;
    }
-
-#ifdef HAVE_PTHREAD_SETNAME_NP
-   #ifdef PTHREAD_MAX_NAMELEN_NP
-   char name[PTHREAD_MAX_NAMELEN_NP];
-   strlcpy(name, proctitle, PTHREAD_MAX_NAMELEN_NP);
-   #else
-   const char *name = proctitle;
-   #endif
-   pthread_setname_np(tid, name);
-#endif
 
    t_index = num_threads;
    if (num_threads < MAX_THREADS) {
@@ -123,13 +105,13 @@ int execute_command(UPSINFO *ups, UPSCOMMANDS cmd)
    if (g_os_version_info.dwPlatformId == VER_PLATFORM_WIN32_WINDOWS) {
       /* Win95/98/ME need environment size parameter and no extra quotes */
       asnprintf(cmdline, sizeof(cmdline), 
-         "\"%s\" /E:4096 /c \"%s%s\" %s %s %d %d \"%s\"",
+         "\"%s\" /E:4096 /c \"%s%s\" %s \"%s\" %d %d \"%s\"",
          comspec, ups->scriptdir, APCCONTROL_FILE, cmd.command,
          ups->upsname, !ups->is_slave(), ups->is_plugged(), sbindir);
    } else {
       /* WinNT/2K/Vista need quotes around the entire sub-command */
       asnprintf(cmdline, sizeof(cmdline), 
-         "\"%s\" /c \"\"%s%s\" %s %s %d %d \"%s\"\"",
+         "\"%s\" /c \"\"%s%s\" %s \"%s\" %d %d \"%s\"\"",
          comspec, ups->scriptdir, APCCONTROL_FILE, cmd.command,
          ups->upsname, !ups->is_slave(), ups->is_plugged(), sbindir);
    }
