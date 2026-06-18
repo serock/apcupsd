@@ -7,7 +7,7 @@ dnl Process this file with autoconf to produce a configure script.
 dnl Process this file with autoheader to produce a config.h.in
 dnl
 
-dnl A distinctive file to look for in srcdir. 
+dnl A distinctive file to look for in srcdir.
 AC_INIT(Developers)
 
 dnl Config header file.
@@ -43,9 +43,9 @@ dnl
 AC_PATH_PROGS(TRUEPRG, true, :)
 AC_PATH_PROGS(FALSEPRG, false, :)
 
-dnl 
+dnl
 dnl Create a new path statement starting with what the user has and
-dnl adding directories we might need.  
+dnl adding directories we might need.
 dnl
 PATH=$PATH:/bin:/sbin:/etc:/usr/bin:/usr/bin/X11:/usr/sbin:/usr/local/bin:/usr/local/sbin
 export PATH
@@ -72,11 +72,11 @@ fi
 
 dnl Special considerations when cross-compiling for win32
 if test "$host_os" = "mingw32" ; then
-   if test -z "$CROSSTOOLS" ; then 
+   if test -z "$CROSSTOOLS" ; then
       CROSSTOOLS=${topdir}/../cross-tools
    fi
-   if test -z "$DEPKGS"; then 
-      DEPKGS=${topdir}/../depkgs-win32 
+   if test -z "$DEPKGS"; then
+      DEPKGS=${topdir}/../depkgs-win32
    fi
    CPPFLAGS="-I${topdir}/src/win32/compat -I$DEPKGS/libroot/include -I$DEPKGS/libroot/include/pthread ${CPPFLAGS}"
    PATH=$CROSSTOOLS/mingw32/bin:$PATH
@@ -115,7 +115,7 @@ dnl
    LDFLAGS="${LDFLAGS} -L/usr/sfw/lib"
 else
 dnl -------------------------------------------
-dnl  non Sun defaults (i.e. all other platforms  
+dnl  non Sun defaults (i.e. all other platforms
 dnl -------------------------------------------
    AC_PREFIX_DEFAULT(/usr)
 dnl
@@ -286,19 +286,19 @@ AC_CHECK_FUNC(strchr,
    [EXTRADEFS="$EXTRADEFS -D_SYSV3"
     LIBS="$LIBS -lcposix"]))
 
-AC_CHECK_FUNC(strstr, AC_DEFINE(HAVE_STRSTR,, [Define if you have strstr]), 
+AC_CHECK_FUNC(strstr, AC_DEFINE(HAVE_STRSTR,, [Define if you have strstr]),
    [LIBEXTRAOBJ="$LIBEXTRAOBJ strstr.c"])
 
-AC_CHECK_FUNC(strcasecmp, AC_DEFINE(HAVE_STRCASECMP,, [Define if you have strcasecmp]), 
+AC_CHECK_FUNC(strcasecmp, AC_DEFINE(HAVE_STRCASECMP,, [Define if you have strcasecmp]),
    [LIBEXTRAOBJ="$LIBEXTRAOBJ strcasecmp.c"])
-        
-AC_CHECK_FUNC(memmove, AC_DEFINE(HAVE_MEMMOVE,, [Define if you have memmove]), 
+
+AC_CHECK_FUNC(memmove, AC_DEFINE(HAVE_MEMMOVE,, [Define if you have memmove]),
    [LIBEXTRAOBJ="$LIBEXTRAOBJ memmove.c"])
-        
+
 AC_CHECK_FUNC(getopt_long, AC_DEFINE(HAVE_GETOPTLONG,, [Define if you have getoptlong]),
    [LIBEXTRAOBJ="$LIBEXTRAOBJ getopt.c getopt1.c"])
 
-AC_CHECK_FUNC(inet_pton, AC_DEFINE(HAVE_INETPTON,, [Define if you have inetpton]), 
+AC_CHECK_FUNC(inet_pton, AC_DEFINE(HAVE_INETPTON,, [Define if you have inetpton]),
     [LIBEXTRAOBJ="$LIBEXTRAOBJ inet_pton.c"])
 
 dnl
@@ -453,7 +453,7 @@ AC_ARG_WITH(libwrap,
 )
 
 
-dnl   
+dnl
 dnl Check for enable of cgi program builds
 dnl
 ENABLE_CGI="no"
@@ -506,7 +506,7 @@ AC_ARG_ENABLE(cgi,
         if test "${SYS_GD_FOUND}" = "no"
         then
            AC_MSG_ERROR([Your system lacks the GD library which is needed for
-                         compiling the apcupsd CGI programs. Please install 
+                         compiling the apcupsd CGI programs. Please install
                          libgd and re-run the ./configure script.
                          Alternatively you can disable the CGI support.])
         fi
@@ -526,7 +526,7 @@ AC_ARG_ENABLE(cgi,
 ])
 
 
-dnl   
+dnl
 dnl Check for enable of drivers
 dnl
 AC_ARG_ENABLE(apcsmart, [
@@ -620,13 +620,13 @@ AC_HELP_STRING([--disable-snmp], [No SNMP driver])],
         AC_DEFINE(HAVE_SNMPLITE_DRIVER,, [Define if building snmplite driver])
         SNMPLITE_DRIVER="snmplite"
         DISPLAY_SNMP_DRIVER="snmp"
-        AC_SUBST(SNMPLITE_DRIVER)        
+        AC_SUBST(SNMPLITE_DRIVER)
         APCDRVLIBS="$APCDRVLIBS \$(topdir)/src/drivers/snmplite/libsnmplitedrv.a"
      fi ],
    [ AC_DEFINE(HAVE_SNMPLITE_DRIVER)
      SNMPLITE_DRIVER="snmplite"
      DISPLAY_SNMP_DRIVER="snmp"
-     AC_SUBST(SNMPLITE_DRIVER) 
+     AC_SUBST(SNMPLITE_DRIVER)
      APCDRVLIBS="$APCDRVLIBS \$(topdir)/src/drivers/snmplite/libsnmplitedrv.a" ])
 
 dnl Enable test driver
@@ -681,7 +681,7 @@ AC_HELP_STRING([--disable-modbus], [No MODBUS driver])],
      fi],
    [ AC_DEFINE(HAVE_MODBUS_DRIVER)
      MODBUS_DRIVER="modbus"
-     AC_SUBST(MODBUS_DRIVER) 
+     AC_SUBST(MODBUS_DRIVER)
      APCDRVLIBS="$APCDRVLIBS \$(topdir)/src/drivers/modbus/libmodbusdrv.a" ])
 
 dnl If USB or MODBUS driver need libusb, handle it now
@@ -699,10 +699,10 @@ if test "$needlibusb" = "true" ; then
             LIBUSB=`$usbcfg --libs`
             LIBUSBH=`$usbcfg --prefix`/include/usb.h
          else
-            AC_CHECK_LIB(usb, usb_init, 
+            AC_CHECK_LIB(usb, usb_init,
                          [LIBUSB=-lusb
                           LIBUSBH=usb.h],
-                         [AC_MSG_ERROR(Unable to find libusb)], 
+                         [AC_MSG_ERROR(Unable to find libusb)],
                          [$DRVLIBS])
          fi
 
@@ -742,7 +742,7 @@ dnl Check for enable of gapcmon
 dnl
 GAPCMON=
 GAPCMON_ENABLED=no
-AC_ARG_ENABLE(gapcmon, 
+AC_ARG_ENABLE(gapcmon,
    [AC_HELP_STRING([--enable-gapcmon], [Build GTK/GUI front-end to apcupsd (default=no)])],
    [ if test "$enableval" = "yes" ; then
       GAPCMON=gapcmon
@@ -762,7 +762,7 @@ dnl Check for enable of apcagent
 dnl
 APCAGENT=
 APCAGENT_ENABLED=no
-AC_ARG_ENABLE(apcagent, 
+AC_ARG_ENABLE(apcagent,
    [AC_HELP_STRING([--enable-apcagent], [Build menubar app for Mac OS X (default=no)])],
    [ if test "$enableval" = "yes" ; then
       case $host in
@@ -991,7 +991,7 @@ else
    DISTNAME=unknown
 fi
 
-dnl   
+dnl
 dnl Check for enable install of distdir
 dnl
 DISTDIR=$DISTNAME
@@ -1005,14 +1005,14 @@ AC_ARG_ENABLE(install-distdir,
 AC_SUBST(DISTDIR)
 
 dnl
-dnl At this point, we define the apcupsd defaults for a 
+dnl At this point, we define the apcupsd defaults for a
 dnl  number of different values (directories, ports, etc)
-dnl  When the distribution is determined a bit lower, the 
+dnl  When the distribution is determined a bit lower, the
 dnl  default can be reset to correspond to the standard for
-dnl  that system.  
+dnl  that system.
 dnl  Finally, after that any value that the user has set via
 dnl  command line options will apply.
-dnl  
+dnl
 
 # Define the default UPS
 UPSTYPE=apcsmart
@@ -1026,7 +1026,7 @@ nologdir=/etc
 # Find the default directory to put the root-mode PID file in
 for PIDDIR in "/var/run" "/etc/apcupsd"
 do
-   if test -d $PIDDIR 
+   if test -d $PIDDIR
    then
       break;
    fi
@@ -1035,7 +1035,7 @@ done
 # Find the default directory to put the apcupsd.events and apcupsd.status files
 for LOGDIR in "/var/log" "/etc/apcupsd"
 do
-   if test -d $LOGDIR 
+   if test -d $LOGDIR
    then
       break;
    fi
@@ -1175,7 +1175,7 @@ slackware)
    DISTVER=`cat /etc/slackware-version`
    DFILES="\
       platforms/slackware/apcupsd \
-      platforms/slackware/rc6.patch" 
+      platforms/slackware/rc6.patch"
    ;;
 sun)
    DISTVER=Solaris
@@ -1242,7 +1242,7 @@ unknown)
 *)
   AC_MSG_WARN([Something went wrong. Unknown DISTNAME $DISTNAME])
   ;;
-esac  
+esac
 
 dnl
 dnl Allow user to set nologdir
@@ -1383,7 +1383,7 @@ echo "
 
 Configuration on `date`:
 
-  Host:                       $host -- ${DISTNAME} ${DISTVER} 
+  Host:                       $host -- ${DISTNAME} ${DISTVER}
   Apcupsd version:            ${VERSION} (${DATE})
   Source code location:       ${srcdir}
   Install binaries:           ${sbindir}
@@ -1426,7 +1426,7 @@ echo
 
 echo $PATH | grep /usr/ucb >/dev/null
 if test $? = 0 ; then
-   AC_MSG_WARN([ 
+   AC_MSG_WARN([
       WARNING! You have /usr/ucb on your path. We STRONGLY recommend
          that you remove it and rerun configure. Otherwise
          apcupsd may be unable to shutdown your system.
