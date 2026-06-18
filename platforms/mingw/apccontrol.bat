@@ -20,7 +20,7 @@ SET APCUPSD="%sbindir%\apcupsd"
 SET SHUTDOWN="%sbindir%\shutdown"
 SET BACKGROUND="%sbindir%\background"
 
-rem Only do popups on Win95/98/ME/NT. All other platforms support 
+rem Only do popups on Win95/98/ME/NT. All other platforms support
 rem balloon notifications which are provided by apctray.
 SET POPUP=echo
 VER | FIND /I "Windows 95" > NUL
@@ -42,7 +42,7 @@ rem   passed by apcupsd to this script. We will accept files with any extension
 rem   included in PATHEXT (*.exe, *.bat, *.cmd, etc).
 rem
 rem After executing your script, apccontrol continues with the default action.
-rem   If you do not want apccontrol to continue, exit your script with exit 
+rem   If you do not want apccontrol to continue, exit your script with exit
 rem   code 99. E.g. "exit /b 99".
 rem
 rem WARNING: please be aware that if you add any commands before the shutdown
@@ -59,8 +59,8 @@ rem Use CALL here because event script might be a batch file itself
 CALL ".\%command%" 2> NUL
 
 rem This is retarded. "IF ERRORLEVEL 99" means greater-than-or-
-rem equal-to 99, so we have to synthesize an == using two IFs. 
-rem Ahh, the glory of Windows batch programming. At least they 
+rem equal-to 99, so we have to synthesize an == using two IFs.
+rem Ahh, the glory of Windows batch programming. At least they
 rem gave us a NOT op.
 IF NOT ERRORLEVEL 99 GOTO :events
 IF NOT ERRORLEVEL 100 GOTO :done

@@ -1,6 +1,6 @@
 INSTALLING APCUPSD WINDOWS USB DRIVER
 
-USB connected UPSes on Windows require a special driver. In most cases, 
+USB connected UPSes on Windows require a special driver. In most cases,
 this driver is automatically installed when you install Apcupsd. However,
 in some cases, you will need to install the driver by hand.
 
@@ -28,14 +28,14 @@ TROUBLESHOOTING
   fix this, uninstall the driver from the device that is giving the error code,
   then do an update driver on the correct device.
 
-- The driver INF has now been signed with Authenticode thanks to Jernej Simoncic 
+- The driver INF has now been signed with Authenticode thanks to Jernej Simoncic
   <jernej's-sflist@eternallybored.org>. During driver installation you will be
   asked to approve the signature.
 
 
 INSTALLATION
 
-Follow these instructions to install the Apcupsd USB driver. If you have the 
+Follow these instructions to install the Apcupsd USB driver. If you have the
 old LibUSB driver installed already, go to the UPGRADE section below instead.
 
     a. Plug in your USB UPS and wait for Windows to recognize it.
@@ -51,7 +51,7 @@ old LibUSB driver installed already, go to the UPGRADE section below instead.
     e. (Abbreviated) Do not allow Windows to search for a driver,
        specify one yourself. Depending on your version of Windows, the exact
        sequence of dialogs and options is different, but essentially you need
-       to get to the list of devices with the "Have Disk..." button. When you 
+       to get to the list of devices with the "Have Disk..." button. When you
        get there, choose "Have Disk..."
 
     f. Browse to "C:\apcupsd\driver" and hit Open
@@ -61,16 +61,16 @@ old LibUSB driver installed already, go to the UPGRADE section below instead.
 
     h. The driver should be installed.
 
-    i. If you examine the Device Manager tree again, you should see 
-       "American Power Conversion USB UPS (Apcupsd)" listed in the 
+    i. If you examine the Device Manager tree again, you should see
+       "American Power Conversion USB UPS (Apcupsd)" listed in the
        "Batteries" section.
 
     Future plugging/unplugging of the UPS will be handled automatically.
     The driver only needs to be installed once.
 
     To UNINSTALL the driver and return to the Windows standard driver, go into
-    Device Manager and do an "Update Driver..." on "American Power Conversion 
-    USB UPS (Apcupsd)". Select the "American Power Conversion USB UPS 
+    Device Manager and do an "Update Driver..." on "American Power Conversion
+    USB UPS (Apcupsd)". Select the "American Power Conversion USB UPS
     (Microsoft)" driver from the list. After that you should be back where you
     started. The "Batteries -> HID UPS Battery" entry should be back.
 
@@ -93,7 +93,7 @@ instructions.
     e. (Abbreviated) Do not allow Windows to search for a driver,
        specify one yourself. Depending on your version of Windows, the exact
        sequence of dialogs and options is different, but essentially you need
-       to get to the list of devices with the "Have Disk..." button. When you 
+       to get to the list of devices with the "Have Disk..." button. When you
        get there, choose "Have Disk..."
 
     f. Browse to "C:\apcupsd\driver" and hit Open
@@ -103,8 +103,8 @@ instructions.
 
     h. The driver should be installed.
 
-    i. If you examine the Device Manager tree again, you should see 
-       "American Power Conversion USB UPS (Apcupsd)" listed in the 
+    i. If you examine the Device Manager tree again, you should see
+       "American Power Conversion USB UPS (Apcupsd)" listed in the
        "Batteries" section. The "LibUSB-Win32 Devices" section should be
        gone.
 
@@ -112,7 +112,7 @@ instructions.
     The driver only needs to be installed once.
 
     To UNINSTALL the driver and return to the Windows standard driver, go into
-    Device Manager and do an "Update Driver..." on "American Power Conversion 
-    USB UPS (Apcupsd)". Select the "American Power Conversion USB UPS 
-    (Microsoft)" driver from the list. After the standard 
+    Device Manager and do an "Update Driver..." on "American Power Conversion
+    USB UPS (Apcupsd)". Select the "American Power Conversion USB UPS
+    (Microsoft)" driver from the list. After the standard
     "Batteries -> HID UPS Battery" entry should be back.

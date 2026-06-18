@@ -1,6 +1,6 @@
 #include "windows.h"
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, 
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
          PSTR szCmdLine, int iCmdShow)
 {
    PROCESS_INFORMATION procinfo;

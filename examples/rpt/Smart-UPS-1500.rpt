@@ -22,51 +22,51 @@ InputReport 8
 
 InputReport 20
   Field 0, app UPS, phys ---
-    Usage 0, AudibleAlarmControl = 2 
+    Usage 0, AudibleAlarmControl = 2
 
 InputReport 7
   Field 0, app UPS, phys ---
-    Usage 0, Charging = 1 
+    Usage 0, Charging = 1
   Field 1, app UPS, phys ---
-    Usage 0, Discharging = 0 
+    Usage 0, Discharging = 0
   Field 2, app UPS, phys ---
-    Usage 0, ACPresent = 1 
+    Usage 0, ACPresent = 1
   Field 3, app UPS, phys ---
-    Usage 0, BatteryPresent = 1 
+    Usage 0, BatteryPresent = 1
   Field 4, app UPS, phys ---
-    Usage 0, BelowRemainingCapacityLimit = 0 
+    Usage 0, BelowRemainingCapacityLimit = 0
   Field 5, app UPS, phys ---
-    Usage 0, ShutdownRequested = 0 
+    Usage 0, ShutdownRequested = 0
   Field 6, app UPS, phys ---
-    Usage 0, ShutdownImminent = 0 
+    Usage 0, ShutdownImminent = 0
   Field 7, app UPS, phys ---
-    Usage 0, RemainingTimeLimitExpired = 0 
+    Usage 0, RemainingTimeLimitExpired = 0
   Field 8, app UPS, phys ---
-    Usage 0, CommunicationLost = 0 
+    Usage 0, CommunicationLost = 0
   Field 9, app UPS, phys ---
-    Usage 0, NeedReplacement = 0 
+    Usage 0, NeedReplacement = 0
   Field 10, app UPS, phys ---
-    Usage 0, Overload = 0 
+    Usage 0, Overload = 0
   Field 11, app UPS, phys ---
-    Usage 0, VoltageNotRegulated = 0 
+    Usage 0, VoltageNotRegulated = 0
   Field 12, app UPS, phys ---
-    Usage 0, [ff860080] = 0 
+    Usage 0, [ff860080] = 0
 
 InputReport 22
   Field 0, app UPS, phys Battery
-    Usage 0, Test = 6 
+    Usage 0, Test = 6
 
 InputReport 23
   Field 0, app UPS, phys Battery
-    Usage 0, APCBattCapBeforeStartup = 15 
+    Usage 0, APCBattCapBeforeStartup = 15
 
 InputReport 27
   Field 0, app UPS, phys Battery
-    Usage 0, [ff86001a] = 3 
+    Usage 0, [ff86001a] = 3
 
 InputReport 28
   Field 0, app UPS, phys Battery
-    Usage 0, [ff86001b] = 0 
+    Usage 0, [ff86001b] = 0
 
 InputReport 21
   Field 0, app UPS, phys Battery
@@ -78,11 +78,11 @@ InputReport 26
 
 InputReport 33
   Field 0, app UPS, phys Input
-    Usage 0, APCLineFailCause = 4 
+    Usage 0, APCLineFailCause = 4
 
 InputReport 34
   Field 0, app UPS, phys Input
-    Usage 0, APCSensitivity = 2 
+    Usage 0, APCSensitivity = 2
 
 InputReport 45
   Field 0, app UPS, phys Output
@@ -106,35 +106,35 @@ InputReport 38
 
 InputReport 54
   Field 0, app UPS, phys ---
-    Usage 0, AudibleAlarmControl = 2 
+    Usage 0, AudibleAlarmControl = 2
 
 InputReport 51
   Field 0, app UPS, phys ---
-    Usage 0, Charging = 1 
+    Usage 0, Charging = 1
   Field 1, app UPS, phys ---
-    Usage 0, Discharging = 0 
+    Usage 0, Discharging = 0
   Field 2, app UPS, phys ---
-    Usage 0, ACPresent = 1 
+    Usage 0, ACPresent = 1
   Field 3, app UPS, phys ---
-    Usage 0, BatteryPresent = 1 
+    Usage 0, BatteryPresent = 1
   Field 4, app UPS, phys ---
-    Usage 0, BelowRemainingCapacityLimit = 0 
+    Usage 0, BelowRemainingCapacityLimit = 0
   Field 5, app UPS, phys ---
-    Usage 0, ShutdownRequested = 0 
+    Usage 0, ShutdownRequested = 0
   Field 6, app UPS, phys ---
-    Usage 0, ShutdownImminent = 0 
+    Usage 0, ShutdownImminent = 0
   Field 7, app UPS, phys ---
-    Usage 0, RemainingTimeLimitExpired = 0 
+    Usage 0, RemainingTimeLimitExpired = 0
   Field 8, app UPS, phys ---
-    Usage 0, CommunicationLost = 0 
+    Usage 0, CommunicationLost = 0
   Field 9, app UPS, phys ---
-    Usage 0, NeedReplacement = 0 
+    Usage 0, NeedReplacement = 0
   Field 10, app UPS, phys ---
-    Usage 0, Overload = 0 
+    Usage 0, Overload = 0
   Field 11, app UPS, phys ---
-    Usage 0, VoltageNotRegulated = 0 
+    Usage 0, VoltageNotRegulated = 0
   Field 12, app UPS, phys ---
-    Usage 0, [ff860080] = 0 
+    Usage 0, [ff860080] = 0
 
 FeatureReport 1
   Field 0, app UPS, phys ---
@@ -158,7 +158,7 @@ FeatureReport 5
 
 FeatureReport 6
   Field 0, app UPS, phys ---
-    Usage 0, Rechargeable = 1 
+    Usage 0, Rechargeable = 1
   Field 1, app UPS, phys ---
 Exponent 0 lost.
     Usage 0, CapacityMode = 2 percent
@@ -204,7 +204,7 @@ FeatureReport 13
 
 FeatureReport 18
   Field 0, app UPS, phys ---
-    Usage 0, DelayBeforeShutdown = -1 
+    Usage 0, DelayBeforeShutdown = -1
 
 FeatureReport 19
   Field 0, app UPS, phys ---
@@ -224,51 +224,51 @@ FeatureReport 11
 
 FeatureReport 20
   Field 0, app UPS, phys ---
-    Usage 0, AudibleAlarmControl = 2 
+    Usage 0, AudibleAlarmControl = 2
 
 FeatureReport 7
   Field 0, app UPS, phys ---
-    Usage 0, Charging = 1 
+    Usage 0, Charging = 1
   Field 1, app UPS, phys ---
-    Usage 0, Discharging = 0 
+    Usage 0, Discharging = 0
   Field 2, app UPS, phys ---
-    Usage 0, ACPresent = 1 
+    Usage 0, ACPresent = 1
   Field 3, app UPS, phys ---
-    Usage 0, BatteryPresent = 1 
+    Usage 0, BatteryPresent = 1
   Field 4, app UPS, phys ---
-    Usage 0, BelowRemainingCapacityLimit = 0 
+    Usage 0, BelowRemainingCapacityLimit = 0
   Field 5, app UPS, phys ---
-    Usage 0, ShutdownRequested = 0 
+    Usage 0, ShutdownRequested = 0
   Field 6, app UPS, phys ---
-    Usage 0, ShutdownImminent = 0 
+    Usage 0, ShutdownImminent = 0
   Field 7, app UPS, phys ---
-    Usage 0, RemainingTimeLimitExpired = 0 
+    Usage 0, RemainingTimeLimitExpired = 0
   Field 8, app UPS, phys ---
-    Usage 0, CommunicationLost = 0 
+    Usage 0, CommunicationLost = 0
   Field 9, app UPS, phys ---
-    Usage 0, NeedReplacement = 0 
+    Usage 0, NeedReplacement = 0
   Field 10, app UPS, phys ---
-    Usage 0, Overload = 0 
+    Usage 0, Overload = 0
   Field 11, app UPS, phys ---
-    Usage 0, VoltageNotRegulated = 0 
+    Usage 0, VoltageNotRegulated = 0
   Field 12, app UPS, phys ---
-    Usage 0, [ff860080] = 0 
+    Usage 0, [ff860080] = 0
 
 FeatureReport 22
   Field 0, app UPS, phys Battery
-    Usage 0, Test = 6 
+    Usage 0, Test = 6
 
 FeatureReport 23
   Field 0, app UPS, phys Battery
-    Usage 0, APCBattCapBeforeStartup = 15 
+    Usage 0, APCBattCapBeforeStartup = 15
 
 FeatureReport 27
   Field 0, app UPS, phys Battery
-    Usage 0, [ff86001a] = 3 
+    Usage 0, [ff86001a] = 3
 
 FeatureReport 28
   Field 0, app UPS, phys Battery
-    Usage 0, [ff86001b] = 0 
+    Usage 0, [ff86001b] = 0
 
 FeatureReport 21
   Field 0, app UPS, phys Battery
@@ -305,15 +305,15 @@ FeatureReport 32
 
 FeatureReport 33
   Field 0, app UPS, phys Input
-    Usage 0, APCLineFailCause = 4 
+    Usage 0, APCLineFailCause = 4
 
 FeatureReport 34
   Field 0, app UPS, phys Input
-    Usage 0, APCSensitivity = 2 
+    Usage 0, APCSensitivity = 2
 
 FeatureReport 44
   Field 0, app UPS, phys Output
-    Usage 0, PercentLoad = 442 
+    Usage 0, PercentLoad = 442
 
 FeatureReport 42
   Field 0, app UPS, phys Output
@@ -345,7 +345,7 @@ FeatureReport 38
 
 FeatureReport 39
   Field 0, app UPS, phys Output
-    Usage 0, DelayBeforeShutdown = -1 
+    Usage 0, DelayBeforeShutdown = -1
 
 FeatureReport 40
   Field 0, app UPS, phys Output
@@ -373,15 +373,15 @@ FeatureReport 49
 
 FeatureReport 52
   Field 0, app UPS, phys ---
-    Usage 0, APC_UPS_FirmwareRevision = 7 
+    Usage 0, APC_UPS_FirmwareRevision = 7
 
 FeatureReport 55
   Field 0, app UPS, phys ---
-    Usage 0, APC_USB_FirmwareRevision = 8 
+    Usage 0, APC_USB_FirmwareRevision = 8
 
 FeatureReport 50
   Field 0, app UPS, phys ---
-    Usage 0, APCPanelTest = 1 
+    Usage 0, APCPanelTest = 1
 
 FeatureReport 53
   Field 0, app UPS, phys ---
@@ -389,43 +389,43 @@ FeatureReport 53
 
 FeatureReport 62
   Field 0, app UPS, phys ---
-    Usage 0, [ff860027] = 0 
+    Usage 0, [ff860027] = 0
 
 FeatureReport 63
   Field 0, app UPS, phys ---
-    Usage 0, [ff860028] = 0 
+    Usage 0, [ff860028] = 0
 
 FeatureReport 54
   Field 0, app UPS, phys ---
-    Usage 0, AudibleAlarmControl = 2 
+    Usage 0, AudibleAlarmControl = 2
 
 FeatureReport 51
   Field 0, app UPS, phys ---
-    Usage 0, Charging = 1 
+    Usage 0, Charging = 1
   Field 1, app UPS, phys ---
-    Usage 0, Discharging = 0 
+    Usage 0, Discharging = 0
   Field 2, app UPS, phys ---
-    Usage 0, ACPresent = 1 
+    Usage 0, ACPresent = 1
   Field 3, app UPS, phys ---
-    Usage 0, BatteryPresent = 1 
+    Usage 0, BatteryPresent = 1
   Field 4, app UPS, phys ---
-    Usage 0, BelowRemainingCapacityLimit = 0 
+    Usage 0, BelowRemainingCapacityLimit = 0
   Field 5, app UPS, phys ---
-    Usage 0, ShutdownRequested = 0 
+    Usage 0, ShutdownRequested = 0
   Field 6, app UPS, phys ---
-    Usage 0, ShutdownImminent = 0 
+    Usage 0, ShutdownImminent = 0
   Field 7, app UPS, phys ---
-    Usage 0, RemainingTimeLimitExpired = 0 
+    Usage 0, RemainingTimeLimitExpired = 0
   Field 8, app UPS, phys ---
-    Usage 0, CommunicationLost = 0 
+    Usage 0, CommunicationLost = 0
   Field 9, app UPS, phys ---
-    Usage 0, NeedReplacement = 0 
+    Usage 0, NeedReplacement = 0
   Field 10, app UPS, phys ---
-    Usage 0, Overload = 0 
+    Usage 0, Overload = 0
   Field 11, app UPS, phys ---
-    Usage 0, VoltageNotRegulated = 0 
+    Usage 0, VoltageNotRegulated = 0
   Field 12, app UPS, phys ---
-    Usage 0, [ff860080] = 0 
+    Usage 0, [ff860080] = 0
 
 Waiting for events ... (interrupt to exit)
 Event: RemainingCapacity = 76

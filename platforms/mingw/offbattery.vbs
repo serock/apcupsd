@@ -1,4 +1,4 @@
-'///Wriiten by Ed Dondlinger 1/23/2009 - edondlinger@thepylegroup.com ///
+'///Written by Ed Dondlinger 1/23/2009 - edondlinger@thepylegroup.com ///
 
 '/// MODIFY THE VARIABLES LISTED BELOW IN THE "USER VARIABLES" SECTION.
 '/// THEN RENAME FILE WITHOUT THE ".example" SUFFIX.
@@ -8,7 +8,7 @@ On Error Resume Next
 
 Dim Get_Status
 Dim oShell
-set oShell = CreateObject("WScript.Shell") 
+set oShell = CreateObject("WScript.Shell")
 
 '/// Get APCUPS Status Report ///
 
@@ -17,7 +17,7 @@ UPS_Status = Get_Status.StdOut.readall
 
 '/// Get Time Zone info from local windows registry ///
 
-atb = "HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\TimeZoneInformation\StandardName" 
+atb = "HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\TimeZoneInformation\StandardName"
 TZInfo = oShell.RegRead(atb)
 
 
@@ -28,7 +28,7 @@ MyLocation = "Home"
 
 MyEmailSubject = "POWER RESTORED at: " & MyLocation
 
-MyEmailFromAddress = "xxx@zzz.com"  'you could also use this format to display the common name: """Me"" <user@mydomain.com>" 
+MyEmailFromAddress = "xxx@zzz.com"  'you could also use this format to display the common name: """Me"" <user@mydomain.com>"
 
 MyEmailToAddress = "xxx@zzz.com"
 
@@ -55,9 +55,9 @@ MySMTPServerSSL = True
 
 '*** NOTE: MSDN CDO Library can be referenced at: http://msdn.microsoft.com/en-us/library/ms872853(EXCHG.65).aspx
 
-Const cdoSendUsingPickup = 1 'Send message using the local SMTP service pickup directory. 
+Const cdoSendUsingPickup = 1 'Send message using the local SMTP service pickup directory.
 Const cdoSendUsingPort = 2 'Send the message using the network (SMTP over the network).
-Const cdoSendUsingExchange = 3  'Send the message using MS Exchange Mail Server. 
+Const cdoSendUsingExchange = 3  'Send the message using MS Exchange Mail Server.
 
 Const cdoAnonymous = 0 'Do not authenticate
 Const cdoBasic = 1 'basic (clear-text) authentication
@@ -65,28 +65,28 @@ Const cdoNTLM = 2 'NTLM
 
 Const cdoURL = "http://schemas.microsoft.com/cdo/configuration/"
 
-Set objMessage = CreateObject("CDO.Message") 
-	
+Set objMessage = CreateObject("CDO.Message")
+
 	'/// Set the message properties. ///
-	
+
 	With objMessage
 
-		.Subject = MyEmailSubject 
-		
-		.From = MyEmailFromAddress 
-		
-		.To = MyEmailToAddress 
-		
+		.Subject = MyEmailSubject
+
+		.From = MyEmailFromAddress
+
+		.To = MyEmailToAddress
+
 		.TextBody = MyTextBody
-		
+
 		'Set Mail Importance level, you can set [high,normal,low]
 		.fields.Item("urn:schemas:mailheader:importance").Value = "high"
-		
+
 		'Set Mail priority level, you can set [1=urgent, 0=normal, -1=nonurgent]
-       		.fields.Item("urn:schemas:mailheader:priority").Value = 1
+        .fields.Item("urn:schemas:mailheader:priority").Value = 1
 
 		.fields.Update()
- 
+
 	End with
 
 	'/// This section provides the configuration information for the remote SMTP server. ///
@@ -94,7 +94,7 @@ Set objMessage = CreateObject("CDO.Message")
 	with objMessage.Configuration.Fields
 
 		'Send Using method (1 = local smtp, 2 = remote network smtp, 3 = MS Exchange)
-		.Item(cdoURL & "sendusing") = 2 
+		.Item(cdoURL & "sendusing") = 2
 
 		'Name or IP of Remote SMTP Server
 		.Item(cdoURL & "smtpserver") = MySMTPServer
@@ -109,7 +109,7 @@ Set objMessage = CreateObject("CDO.Message")
 		.Item(cdoURL & "sendpassword") = MyMailServerPW
 
 		'Server port (typically 25)
-		.Item(cdoURL & "smtpserverport") = MySMTPServerPort 
+		.Item(cdoURL & "smtpserverport") = MySMTPServerPort
 
 		'Use SSL for the connection (False or True)
 		.Item(cdoURL & "smtpusessl") = MySMTPServerSSL
@@ -125,7 +125,7 @@ Set objMessage = CreateObject("CDO.Message")
 
 '/// Send the message ///
 
-objMessage.Send 
+objMessage.Send
 
 
 '/// Clean-up ///

@@ -1,16 +1,16 @@
-/* 
+/*
  * Dumb Windows program to put up a message box
  * containing the command line.  Any leading and
  * trailing quotes are stripped.
- * 
+ *
  *  Kern E. Sibbald
- *   July MM  
+ *   July MM
  */
 #include "windows.h"
 #include <stdio.h>
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, 
-		   PSTR szCmdLine, int iCmdShow)
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+           PSTR szCmdLine, int iCmdShow)
 {
    int len = strlen(szCmdLine);
    char *msg, *wordPtr;
@@ -32,7 +32,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
    if (*szCmdLine != '"' && *wordPtr == '"') {
       wordPtr++;
       while (*wordPtr && *wordPtr == ' ')
-	 wordPtr++;		 /* strip leading spaces */
+         wordPtr++;	     /* strip leading spaces */
       szCmdLine = wordPtr;
       len = strlen(szCmdLine);
    }

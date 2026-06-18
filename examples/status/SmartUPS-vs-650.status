@@ -28,7 +28,7 @@ LOTRANS  : N/A
 HITRANS  : N/A
 RETPCT   : N/A
 STATFLAG : 0x08 Status Flag
-STATUS   : ONLINE 
+STATUS   : ONLINE
 ITEMP    : N/A
 ALARMDEL : N/A
 LASTXFER : Line voltage notch or spike

@@ -1,9 +1,9 @@
 TITLE:		Apcupsd
-LFS VERSION:	any 
+LFS VERSION:	any
 AUTHOR:		John McSwain <jmcswain@infoave.net>
 
 SYNOPSIS:
-	Installing Apcupsd to protect an LFS system using APC UPS.    
+	Installing Apcupsd to protect an LFS system using APC UPS.
 
 HINT:
 version 1.0 (06/27/2001)
@@ -19,7 +19,7 @@ TABLE OF CONTENTS
       3.2.1 Boot script
       3.2.2 Poweroff script
       3.2.3 Symlink the scripts
-4 Configuration      
+4 Configuration
 5 Conclusion
 
 
@@ -29,7 +29,7 @@ TABLE OF CONTENTS
 
 Apcupsd is useful for controlling American Power Conversion's (APC)
 uninterruptiple power supplies (UPS).  Apcupsd monitors the UPS and during a
-power loss, informs the system users of the failure, and if power is not 
+power loss, informs the system users of the failure, and if power is not
 restored, safely shuts down the system.  The Apcupsd manual (available on line
 at http://www.sibbald.com/apcupsd/manual/index.html or with the software)
 provides excellent instructions on installing and configuring the software.
@@ -60,7 +60,7 @@ http://www.oasi.gpa.it/riccardo/linux/apcupsd/
 http://www.sibbald.com/apcupsd/
 ftp://ftp.oasi.gpa.it/pub/apcupsd/
 
-As of this writing the latest stable release is Apcupsd-3.8.1.  However 
+As of this writing the latest stable release is Apcupsd-3.8.1.  However
 Apcupsd-3.8.2Beta14 has been used with no problems by this author.
 
 
@@ -162,9 +162,9 @@ esac
 =====================
 
 This poweroff script is needed to shutdown the UPS after the system has halted.
-(Note: Depending on the UPS this could take a minute or two).  Thus when the 
+(Note: Depending on the UPS this could take a minute or two).  Thus when the
 power returns the UPS will come back on and the system will power up (providing
-your atx bios supports powerup).  
+your atx bios supports powerup).
 
 Apcupsd for most distributions modifies the existing halt script.  Rather than
 that route we are making a separate script called UPSdown.
@@ -184,7 +184,7 @@ if [ -f /etc/apcupsd/powerfail ]; then
         echo
         echo "APCUPSD will now power off the UPS"
         echo
-        /etc/apcupsd/apccontrol killpower       
+        /etc/apcupsd/apccontrol killpower
         echo
         echo "Verify the UPS shuts down or turn off the system"
         echo
@@ -243,4 +243,4 @@ individual user a lot of options depending on his needs and desires.  For
 example I use the cgi feature to be able to see the status of my UPS from a
 browser.  I use the notification feature to mail the electric company that I
 have loss power.  These and other features along with a description of the
-workings of Apcupsd are fully described in the Apcupsd manual. 
+workings of Apcupsd are fully described in the Apcupsd manual.

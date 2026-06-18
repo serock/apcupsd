@@ -20,47 +20,47 @@ Exponent 0 lost.
 
 InputReport 22
   Field 0, app UPS, phys PowerSummary
-    Usage 0, Charging = 0 
+    Usage 0, Charging = 0
   Field 1, app UPS, phys PowerSummary
-    Usage 0, Discharging = 0 
+    Usage 0, Discharging = 0
   Field 2, app UPS, phys PowerSummary
-    Usage 0, ACPresent = 1 
+    Usage 0, ACPresent = 1
   Field 3, app UPS, phys PowerSummary
-    Usage 0, BatteryPresent = 1 
+    Usage 0, BatteryPresent = 1
   Field 4, app UPS, phys PowerSummary
-    Usage 0, BelowRemainingCapacityLimit = 0 
+    Usage 0, BelowRemainingCapacityLimit = 0
   Field 5, app UPS, phys PowerSummary
-    Usage 0, ShutdownImminent = 0 
+    Usage 0, ShutdownImminent = 0
   Field 6, app UPS, phys PowerSummary
-    Usage 0, RemainingTimeLimitExpired = 0 
+    Usage 0, RemainingTimeLimitExpired = 0
   Field 7, app UPS, phys PowerSummary
-    Usage 0, NeedReplacement = 0 
+    Usage 0, NeedReplacement = 0
   Field 8, app UPS, phys PowerSummary
-    Usage 0, Overload = 0 
+    Usage 0, Overload = 0
   Field 9, app UPS, phys PowerSummary
-    Usage 0, --- = 0 
-    Usage 1, --- = 0 
-    Usage 2, --- = 0 
-    Usage 3, --- = 0 
-    Usage 4, --- = 0 
-    Usage 5, --- = 0 
-    Usage 6, --- = 0 
-    Usage 7, --- = 0 
-    Usage 8, --- = 0 
-    Usage 9, --- = 0 
-    Usage 10, --- = 0 
-    Usage 11, --- = 0 
-    Usage 12, --- = 0 
-    Usage 13, --- = 0 
-    Usage 14, --- = 0 
-    Usage 15, --- = 0 
-    Usage 16, --- = 0 
-    Usage 17, --- = 0 
-    Usage 18, --- = 0 
-    Usage 19, --- = 0 
-    Usage 20, --- = 0 
-    Usage 21, --- = 0 
-    Usage 22, --- = 0 
+    Usage 0, --- = 0
+    Usage 1, --- = 0
+    Usage 2, --- = 0
+    Usage 3, --- = 0
+    Usage 4, --- = 0
+    Usage 5, --- = 0
+    Usage 6, --- = 0
+    Usage 7, --- = 0
+    Usage 8, --- = 0
+    Usage 9, --- = 0
+    Usage 10, --- = 0
+    Usage 11, --- = 0
+    Usage 12, --- = 0
+    Usage 13, --- = 0
+    Usage 14, --- = 0
+    Usage 15, --- = 0
+    Usage 16, --- = 0
+    Usage 17, --- = 0
+    Usage 18, --- = 0
+    Usage 19, --- = 0
+    Usage 20, --- = 0
+    Usage 21, --- = 0
+    Usage 22, --- = 0
 
 FeatureReport 1
   Field 0, app UPS, phys PowerSummary
@@ -68,7 +68,7 @@ FeatureReport 1
 
 FeatureReport 2
   Field 0, app UPS, phys PowerSummary
-    Usage 0, iSerialNumber = 2  5B0649U02550  
+    Usage 0, iSerialNumber = 2  5B0649U02550
 
 FeatureReport 3
   Field 0, app UPS, phys PowerSummary
@@ -80,7 +80,7 @@ FeatureReport 4
 
 FeatureReport 5
   Field 0, app UPS, phys PowerSummary
-    Usage 0, Rechargeable = 1 
+    Usage 0, Rechargeable = 1
 
 FeatureReport 6
   Field 0, app UPS, phys PowerSummary
@@ -146,47 +146,47 @@ Exponent 2 lost.
 
 FeatureReport 22
   Field 0, app UPS, phys PowerSummary
-    Usage 0, Charging = 0 
+    Usage 0, Charging = 0
   Field 1, app UPS, phys PowerSummary
-    Usage 0, Discharging = 0 
+    Usage 0, Discharging = 0
   Field 2, app UPS, phys PowerSummary
-    Usage 0, ACPresent = 1 
+    Usage 0, ACPresent = 1
   Field 3, app UPS, phys PowerSummary
-    Usage 0, BatteryPresent = 1 
+    Usage 0, BatteryPresent = 1
   Field 4, app UPS, phys PowerSummary
-    Usage 0, BelowRemainingCapacityLimit = 0 
+    Usage 0, BelowRemainingCapacityLimit = 0
   Field 5, app UPS, phys PowerSummary
-    Usage 0, ShutdownImminent = 0 
+    Usage 0, ShutdownImminent = 0
   Field 6, app UPS, phys PowerSummary
-    Usage 0, RemainingTimeLimitExpired = 0 
+    Usage 0, RemainingTimeLimitExpired = 0
   Field 7, app UPS, phys PowerSummary
-    Usage 0, NeedReplacement = 0 
+    Usage 0, NeedReplacement = 0
   Field 8, app UPS, phys PowerSummary
-    Usage 0, Overload = 0 
+    Usage 0, Overload = 0
   Field 9, app UPS, phys PowerSummary
-    Usage 0, --- = 0 
-    Usage 1, --- = 0 
-    Usage 2, --- = 0 
-    Usage 3, --- = 0 
-    Usage 4, --- = 0 
-    Usage 5, --- = 0 
-    Usage 6, --- = 0 
-    Usage 7, --- = 0 
-    Usage 8, --- = 0 
-    Usage 9, --- = 0 
-    Usage 10, --- = 0 
-    Usage 11, --- = 0 
-    Usage 12, --- = 0 
-    Usage 13, --- = 0 
-    Usage 14, --- = 0 
-    Usage 15, --- = 0 
-    Usage 16, --- = 0 
-    Usage 17, --- = 0 
-    Usage 18, --- = 0 
-    Usage 19, --- = 0 
-    Usage 20, --- = 0 
-    Usage 21, --- = 0 
-    Usage 22, --- = 0 
+    Usage 0, --- = 0
+    Usage 1, --- = 0
+    Usage 2, --- = 0
+    Usage 3, --- = 0
+    Usage 4, --- = 0
+    Usage 5, --- = 0
+    Usage 6, --- = 0
+    Usage 7, --- = 0
+    Usage 8, --- = 0
+    Usage 9, --- = 0
+    Usage 10, --- = 0
+    Usage 11, --- = 0
+    Usage 12, --- = 0
+    Usage 13, --- = 0
+    Usage 14, --- = 0
+    Usage 15, --- = 0
+    Usage 16, --- = 0
+    Usage 17, --- = 0
+    Usage 18, --- = 0
+    Usage 19, --- = 0
+    Usage 20, --- = 0
+    Usage 21, --- = 0
+    Usage 22, --- = 0
 
 FeatureReport 23
   Field 0, app UPS, phys PowerSummary
@@ -194,7 +194,7 @@ FeatureReport 23
 
 FeatureReport 24
   Field 0, app UPS, phys PowerSummary
-    Usage 0, AudibleAlarmControl = 1 
+    Usage 0, AudibleAlarmControl = 1
 
 FeatureReport 28
   Field 0, app UPS, phys Battery
@@ -228,11 +228,11 @@ FeatureReport 38
 
 FeatureReport 39
   Field 0, app UPS, phys Battery
-    Usage 0, APC860024_?????? = 240 
+    Usage 0, APC860024_?????? = 240
 
 FeatureReport 40
   Field 0, app UPS, phys Battery
-    Usage 0, [ff860018] = 0 
+    Usage 0, [ff860018] = 0
 
 FeatureReport 48
   Field 0, app UPS, phys Input
@@ -252,19 +252,19 @@ FeatureReport 51
 
 FeatureReport 52
   Field 0, app UPS, phys Input
-    Usage 0, APC860024_?????? = 128 
+    Usage 0, APC860024_?????? = 128
 
 FeatureReport 53
   Field 0, app UPS, phys Input
-    Usage 0, APC860061_?????? = 1 
+    Usage 0, APC860061_?????? = 1
 
 FeatureReport 54
   Field 0, app UPS, phys Input
-    Usage 0, APCLineFailCause = 0 
+    Usage 0, APCLineFailCause = 0
 
 FeatureReport 64
   Field 0, app UPS, phys APCGeneralCollection
-    Usage 0, APCForceShutdown = 0 
+    Usage 0, APCForceShutdown = 0
 
 FeatureReport 65
   Field 0, app UPS, phys APCGeneralCollection
@@ -272,23 +272,23 @@ FeatureReport 65
 
 FeatureReport 80
   Field 0, app UPS, phys PowerConverter
-    Usage 0, PercentLoad = 14 
+    Usage 0, PercentLoad = 14
 
 FeatureReport 81
   Field 0, app UPS, phys PowerConverter
-    Usage 0, APC860024_?????? = 124 
+    Usage 0, APC860024_?????? = 124
 
 FeatureReport 96
   Field 0, app UPS, phys [ff860001]
-    Usage 0, APC860023_?????? = 0 
+    Usage 0, APC860023_?????? = 0
 
 FeatureReport 97
   Field 0, app UPS, phys [ff860001]
-    Usage 0, APC860026_?????? = 10 
+    Usage 0, APC860026_?????? = 10
 
 FeatureReport 98
   Field 0, app UPS, phys [ff860001]
-    Usage 0, APC860025_?????? = 0 
+    Usage 0, APC860025_?????? = 0
 
 FeatureReport 127
   Field 0, app UPS, phys ---
@@ -296,11 +296,11 @@ FeatureReport 127
 
 FeatureReport 126
   Field 0, app UPS, phys ---
-    Usage 0, APC_UPS_FirmwareRevision = 5 
+    Usage 0, APC_UPS_FirmwareRevision = 5
 
 FeatureReport 125
   Field 0, app UPS, phys ---
-    Usage 0, iSerialNumber = 2  5B0649U02550  
+    Usage 0, iSerialNumber = 2  5B0649U02550
 
 FeatureReport 124
   Field 0, app UPS, phys ---
@@ -312,54 +312,54 @@ FeatureReport 123
 
 FeatureReport 122
   Field 0, app UPS, phys ---
-    Usage 0, Charging = 0 
+    Usage 0, Charging = 0
   Field 1, app UPS, phys ---
-    Usage 0, Discharging = 0 
+    Usage 0, Discharging = 0
   Field 2, app UPS, phys ---
-    Usage 0, ACPresent = 1 
+    Usage 0, ACPresent = 1
   Field 3, app UPS, phys ---
-    Usage 0, BatteryPresent = 1 
+    Usage 0, BatteryPresent = 1
   Field 4, app UPS, phys ---
-    Usage 0, BelowRemainingCapacityLimit = 0 
+    Usage 0, BelowRemainingCapacityLimit = 0
   Field 5, app UPS, phys ---
-    Usage 0, ShutdownImminent = 0 
+    Usage 0, ShutdownImminent = 0
   Field 6, app UPS, phys ---
-    Usage 0, RemainingTimeLimitExpired = 0 
+    Usage 0, RemainingTimeLimitExpired = 0
   Field 7, app UPS, phys ---
-    Usage 0, NeedReplacement = 0 
+    Usage 0, NeedReplacement = 0
   Field 8, app UPS, phys ---
-    Usage 0, Overload = 0 
+    Usage 0, Overload = 0
   Field 9, app UPS, phys ---
-    Usage 0, --- = 0 
-    Usage 1, --- = 0 
-    Usage 2, --- = 0 
-    Usage 3, --- = 0 
-    Usage 4, --- = 0 
-    Usage 5, --- = 0 
-    Usage 6, --- = 0 
-    Usage 7, --- = 0 
-    Usage 8, --- = 0 
-    Usage 9, --- = 0 
-    Usage 10, --- = 0 
-    Usage 11, --- = 0 
-    Usage 12, --- = 0 
-    Usage 13, --- = 0 
-    Usage 14, --- = 0 
-    Usage 15, --- = 0 
-    Usage 16, --- = 0 
-    Usage 17, --- = 0 
-    Usage 18, --- = 0 
-    Usage 19, --- = 0 
-    Usage 20, --- = 0 
-    Usage 21, --- = 0 
-    Usage 22, --- = 0 
+    Usage 0, --- = 0
+    Usage 1, --- = 0
+    Usage 2, --- = 0
+    Usage 3, --- = 0
+    Usage 4, --- = 0
+    Usage 5, --- = 0
+    Usage 6, --- = 0
+    Usage 7, --- = 0
+    Usage 8, --- = 0
+    Usage 9, --- = 0
+    Usage 10, --- = 0
+    Usage 11, --- = 0
+    Usage 12, --- = 0
+    Usage 13, --- = 0
+    Usage 14, --- = 0
+    Usage 15, --- = 0
+    Usage 16, --- = 0
+    Usage 17, --- = 0
+    Usage 18, --- = 0
+    Usage 19, --- = 0
+    Usage 20, --- = 0
+    Usage 21, --- = 0
+    Usage 22, --- = 0
 
 FeatureReport 121
   Field 0, app UPS, phys ---
-    Usage 0, APCPanelTest = 0 
+    Usage 0, APCPanelTest = 0
 
 FeatureReport 120
   Field 0, app UPS, phys ---
-    Usage 0, AudibleAlarmControl = 1 
+    Usage 0, AudibleAlarmControl = 1
 
 Waiting for events ... (interrupt to exit)
