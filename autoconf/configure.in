@@ -243,13 +243,13 @@ if test "$host_os" != "mingw32" ; then
    AC_TRY_LINK(
       [#include <syslog.h>],
       [syslog(0, "%s", "test");],
-      AC_MSG_RESULT([yes]),
-      AC_CHECK_LIB(socket, std_syslog,,
+      [AC_MSG_RESULT([yes])],
+      [AC_CHECK_LIB(socket, std_syslog,,
          [AC_MSG_ERROR([cannot find required function.])])
       AC_TRY_LINK(
          [#include <syslog.h>],
-         [syslog(0, "%s", "test");], AC_MSG_RESULT([yes]),
-         [AC_MSG_ERROR([cannot find required function.])])
+         [syslog(0, "%s", "test");], [AC_MSG_RESULT([yes])],
+         [AC_MSG_ERROR([cannot find required function.])])]
    )
 fi
 
