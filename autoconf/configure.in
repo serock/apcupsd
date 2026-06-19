@@ -241,13 +241,29 @@ if test "$host_os" != "mingw32" ; then
 
    AC_MSG_CHECKING([for syslog])
 
-   AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <syslog.h>]], [[syslog(0, "%s", "test");]])],[AC_MSG_RESULT([yes])],[AC_CHECK_LIB(socket, std_syslog,,
-         [AC_MSG_ERROR([cannot find required function.])])
-      _au_m4_changequote([,])AC_TRY_LINK(
-         [#include <syslog.h>],
-         [syslog(0, "%s", "test");], [AC_MSG_RESULT([yes])],
-         [AC_MSG_ERROR([cannot find required function.])])
-   ])
+   AC_LINK_IFELSE(
+      [ AC_LANG_PROGRAM(
+          [[#include <syslog.h>]],
+          [[syslog(0, "%s", "test");]]
+        )
+      ],
+      [ AC_MSG_RESULT([yes]) ],
+      [ AC_CHECK_LIB(
+          socket,
+          std_syslog,,
+          [AC_MSG_ERROR([cannot find required function.])]
+        )
+        AC_LINK_IFELSE(
+          [ AC_LANG_PROGRAM(
+              [[#include <syslog.h>]],
+              [[syslog(0, "%s", "test");]]
+            )
+          ],
+          [AC_MSG_RESULT([yes])],
+          [AC_MSG_ERROR([cannot find required function.])]
+        )
+      ]
+   )
 fi
 
 dnl Solaris hides nanosleep in one of two libraries depending on version
@@ -422,23 +438,36 @@ AC_ARG_WITH(libwrap,
          saved_LIBS="$LIBS"
          LIBS="$saved_LIBS -lwrap"
          AC_MSG_CHECKING([for libwrap])
-         AC_LINK_IFELSE([AC_LANG_PROGRAM([[ #include <tcpd.h>
-              int deny_severity = 0;
-              int allow_severity = 0;
-              struct request_info *req; ]], [[ hosts_access(req); ]])],[ AC_MSG_RESULT([yes])
-              AC_DEFINE(HAVE_LIBWRAP,, [Define if you have libwrap])
-              TCPW_MSG="yes" ],[ LIBS="$saved_LIBS -lwrap -lnsl"
-              _au_m4_changequote([,])AC_TRY_LINK(
-                 [ #include <tcpd.h>
+         AC_LINK_IFELSE(
+            [ AC_LANG_PROGRAM(
+                [[ #include <tcpd.h>
                    int deny_severity = 0;
                    int allow_severity = 0;
-                   struct request_info *req; ],
-                 [ hosts_access(req); ],
+                   struct request_info *req; ]],
+                [[ hosts_access(req); ]]
+              )
+            ],
+            [ AC_MSG_RESULT([yes])
+              AC_DEFINE(HAVE_LIBWRAP,, [Define if you have libwrap])
+              TCPW_MSG="yes"
+            ],
+            [ LIBS="$saved_LIBS -lwrap -lnsl"
+              AC_LINK_IFELSE(
+                 [ AC_LANG_PROGRAM(
+                     [[ #include <tcpd.h>
+                        int deny_severity = 0;
+                        int allow_severity = 0;
+                        struct request_info *req; ]],
+                     [[ hosts_access(req); ]]
+                   )
+                 ],
                  [ AC_MSG_RESULT([yes])
                    AC_DEFINE(HAVE_LIBWRAP)
-                   TCPW_MSG="yes" ],
-                 [AC_MSG_ERROR([*** libwrap missing]) ]
-              ])
+                   TCPW_MSG="yes"
+                 ],
+                 [AC_MSG_ERROR([*** libwrap missing])]
+              )
+            ]
          )
       fi
    ]
