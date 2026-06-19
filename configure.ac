@@ -183,7 +183,7 @@ AC_SUBST(SMTP)
 AC_SUBST(APCTEST)
 
 dnl Now check for programs
-AC_REQ_PATH_PROGS(SHUTDOWN, shutdown shutdown.bsd)
+APC_REQ_PATH_PROGS(SHUTDOWN, shutdown shutdown.bsd)
 
 AC_PATH_PROGS(APCUPSD_MAIL, mail, no)
 if test "$APCUPSD_MAIL" = "no"
@@ -192,18 +192,18 @@ then
    APCUPSD_MAIL=mail
 fi
 
-AC_REQ_PATH_PROGS(WALL, wall)
-AC_REQ_PATH_PROGS(SCRIPTSHELL, sh bash)
+APC_REQ_PATH_PROGS(WALL, wall)
+APC_REQ_PATH_PROGS(SCRIPTSHELL, sh bash)
 
-AC_PROG_GMAKE
-AC_REQ_TOOL(RANLIB, ranlib)
-AC_REQ_PATH_PROG(RM, rm)
-AC_REQ_PATH_PROG(CP, cp)
-AC_REQ_PATH_PROG(ECHO, echo)
-AC_REQ_PATH_PROG(LN, ln)
-AC_REQ_PATH_PROG(SED, sed)
-AC_REQ_TOOL(AR, ar)
-AC_REQ_PATH_PROG(MV, mv)
+APC_PROG_GMAKE
+APC_REQ_TOOL(RANLIB, ranlib)
+APC_REQ_PATH_PROG(RM, rm)
+APC_REQ_PATH_PROG(CP, cp)
+APC_REQ_PATH_PROG(ECHO, echo)
+APC_REQ_PATH_PROG(LN, ln)
+APC_REQ_PATH_PROG(SED, sed)
+APC_REQ_TOOL(AR, ar)
+APC_REQ_PATH_PROG(MV, mv)
 AC_CHECK_TOOL(WINDRES, windres)
 AC_CHECK_TOOLS(STRP, strip true)
 
@@ -355,7 +355,7 @@ AC_TYPE_OFF_T
 AC_TYPE_PID_T
 AC_TYPE_SIZE_T
 AC_TYPE_UID_T
-AC_TYPE_SOCKETLEN_T
+APC_TYPE_SOCKETLEN_T
 
 dnl
 dnl Check for system services.
@@ -881,12 +881,12 @@ if test -n "$GCC"; then
 fi
 
 dnl Disable exceptions and RTTI if compiler supports it
-AX_ADD_COMPILE_FLAG(-fno-exceptions)
-AX_ADD_COMPILE_FLAG(-fno-rtti)
+APC_ADD_COMPILE_FLAG([-fno-exceptions])
+APC_ADD_COMPILE_FLAG([-fno-rtti])
 
 dnl Configure compile warnings
-AX_ADD_COMPILE_FLAG(-Wall)
-AX_ADD_COMPILE_FLAG(-Wno-unused-result)
+APC_ADD_COMPILE_FLAG([-Wall])
+APC_ADD_COMPILE_FLAG([-Wno-unused-result])
 
 AC_SUBST(MAKE)
 AC_SUBST(CP)
