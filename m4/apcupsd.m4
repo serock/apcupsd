@@ -1,12 +1,12 @@
 AC_DEFUN(APC_TYPE_SOCKETLEN_T,
 [ dnl check for socklen_t (in Unix98)
   AC_MSG_CHECKING(for socklen_t)
-  AC_TRY_COMPILE([
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
   #include <sys/types.h>
   #include <sys/socket.h>
   socklen_t x;
-  ],[],[AC_MSG_RESULT(yes)],[
-  AC_TRY_COMPILE([
+  ]], [[]])],[AC_MSG_RESULT(yes)],[
+  _au_m4_changequote([,])AC_TRY_COMPILE([
   #include <sys/types.h>
   #include <sys/socket.h>
   int accept (int, struct sockaddr *, size_t *);
@@ -46,7 +46,7 @@ AC_DEFUN(
    [APC_REQ_PATH_PROGS],
    [AC_PATH_PROGS($1,$2,)
     if test "$$1" = "" ; then
-       AC_ERROR(Missing required tool; need any one of: $2)
+       AC_MSG_ERROR(Missing required tool; need any one of: $2)
     fi
    ])
 
@@ -57,7 +57,7 @@ AC_DEFUN(
    [APC_REQ_PATH_PROG],
    [AC_PATH_PROG($1,$2,)
     if test "$$1" = "" ; then
-       AC_ERROR(Missing required tool: $2)
+       AC_MSG_ERROR(Missing required tool: $2)
     fi
    ])
 
@@ -68,7 +68,7 @@ AC_DEFUN(
    [APC_REQ_TOOL],
    [AC_CHECK_TOOL($1,$2,)
     if test "$$1" = "" ; then
-       AC_ERROR(Missing required tool: $2)
+       AC_MSG_ERROR(Missing required tool: $2)
     fi
    ])
 
