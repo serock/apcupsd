@@ -1,20 +1,31 @@
-AC_DEFUN(APC_TYPE_SOCKETLEN_T,
-[ dnl check for socklen_t (in Unix98)
-  AC_MSG_CHECKING(for socklen_t)
-  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
-  #include <sys/types.h>
-  #include <sys/socket.h>
-  socklen_t x;
-  ]], [[]])],[AC_MSG_RESULT(yes)],[
-  _au_m4_changequote([,])AC_TRY_COMPILE([
-  #include <sys/types.h>
-  #include <sys/socket.h>
-  int accept (int, struct sockaddr *, size_t *);
-  ],[],[
-  AC_MSG_RESULT(size_t)
-  AC_DEFINE(socklen_t,size_t,[Define base type for socklen_t if needed])], [
-  AC_MSG_RESULT(int)
-  AC_DEFINE(socklen_t,int)])])
+dnl check for socklen_t (in Unix98)
+AC_DEFUN([APC_TYPE_SOCKETLEN_T], [
+    AC_MSG_CHECKING([for socklen_t])
+    AC_COMPILE_IFELSE([
+        AC_LANG_PROGRAM([[
+#include <sys/types.h>
+#include <sys/socket.h>
+socklen_t x;
+        ]], [[
+        ]])
+    ], [
+        AC_MSG_RESULT([yes])
+    ], [
+        AC_COMPILE_IFELSE([
+            AC_LANG_PROGRAM([[
+#include <sys/types.h>
+#include <sys/socket.h>
+int accept (int, struct sockaddr *, size_t *);
+            ]], [[
+            ]])
+        ], [
+            AC_MSG_RESULT([size_t])
+            AC_DEFINE([socklen_t], [size_t], [Define base type for socklen_t if needed])
+        ], [
+            AC_MSG_RESULT([int])
+            AC_DEFINE([socklen_t], [int], [Define base type for socklen_t if needed])
+        ])
+    ])
 ])
 
 dnl
