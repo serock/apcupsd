@@ -8,10 +8,11 @@ dnl Process this file with autoheader to produce a config.h.in
 dnl
 
 dnl A distinctive file to look for in srcdir.
-AC_INIT(Developers)
+AC_INIT
+AC_CONFIG_SRCDIR([Developers])
 
 dnl Config header file.
-AC_CONFIG_HEADER(include/apcconfig.h:autoconf/config.h.in)
+AC_CONFIG_HEADERS([include/apcconfig.h:autoconf/config.h.in])
 
 topdir=`pwd`
 AC_CONFIG_AUX_DIR(${topdir}/autoconf)
@@ -66,7 +67,7 @@ if test "$cross_compiling" = "no" ; then
    for libdir in /usr/local/lib64 /usr/local/lib ; do
       if test -d "$libdir" ; then
          LDFLAGS="${LDFLAGS} -L$libdir"
-       fi
+      fi
    done
 fi
 
@@ -142,7 +143,7 @@ AC_PROG_CC                 dnl Determine a C compiler to use.
 AC_PROG_CPP                dnl Determine a C pre-processor to use.
 AC_PROG_INSTALL            dnl Determine a BSD install program.
 AC_PROG_AWK
-AC_ISC_POSIX
+AC_SEARCH_LIBS([strerror],[cposix])
 
 dnl Default linker is gcc
 if test x$LD = x ; then
@@ -240,17 +241,13 @@ if test "$host_os" != "mingw32" ; then
 
    AC_MSG_CHECKING([for syslog])
 
-   AC_TRY_LINK(
-      [#include <syslog.h>],
-      [syslog(0, "%s", "test");],
-      [AC_MSG_RESULT([yes])],
-      [AC_CHECK_LIB(socket, std_syslog,,
+   AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <syslog.h>]], [[syslog(0, "%s", "test");]])],[AC_MSG_RESULT([yes])],[AC_CHECK_LIB(socket, std_syslog,,
          [AC_MSG_ERROR([cannot find required function.])])
-      AC_TRY_LINK(
+      _au_m4_changequote([,])AC_TRY_LINK(
          [#include <syslog.h>],
          [syslog(0, "%s", "test");], [AC_MSG_RESULT([yes])],
-         [AC_MSG_ERROR([cannot find required function.])])]
-   )
+         [AC_MSG_ERROR([cannot find required function.])])
+   ])
 fi
 
 dnl Solaris hides nanosleep in one of two libraries depending on version
@@ -321,7 +318,20 @@ AC_CHECK_HEADERS(
 AC_CHECK_HEADERS(arpa/nameser.h,AC_DEFINE(HAVE_NAMESER_H,, [Define if you have nameser.h]))
 
 AC_HEADER_STAT       dnl Check for S_ISDIR and S_ISREG macros.
-AC_HEADER_TIME       dnl Check for time.h and sys/time.h.
+m4_warn([obsolete],
+[Update your code to rely only on HAVE_SYS_TIME_H,
+then remove this warning and the obsolete code below it.
+All current systems provide time.h; it need not be checked for.
+Not all systems provide sys/time.h, but those that do, all allow
+you to include it and time.h simultaneously.])dnl
+AC_CHECK_HEADERS_ONCE([sys/time.h])
+# Obsolete code to be removed.
+if test $ac_cv_header_sys_time_h = yes; then
+  AC_DEFINE([TIME_WITH_SYS_TIME],[1],[Define to 1 if you can safely include both <sys/time.h>
+         and <time.h>.  This macro is obsolete.])
+fi
+# End of obsolete code.
+       dnl Check for time.h and sys/time.h.
 AC_HEADER_SYS_WAIT      dnl Check for <sys/wait.h>
 
 dnl
@@ -337,7 +347,19 @@ AC_TYPE_GETGROUPS
 AC_TYPE_MODE_T
 AC_TYPE_OFF_T
 AC_TYPE_PID_T
-AC_TYPE_SIGNAL
+m4_warn([obsolete],
+[your code may safely assume C89 semantics that RETSIGTYPE is void.
+Remove this warning and the 'AC_CACHE_CHECK' when you adjust the code.])dnl
+AC_CACHE_CHECK([return type of signal handlers],[ac_cv_type_signal],[AC_COMPILE_IFELSE(
+[AC_LANG_PROGRAM([#include <sys/types.h>
+#include <signal.h>
+],
+         [return *(signal (0, 0)) (0) == 1;])],
+           [ac_cv_type_signal=int],
+           [ac_cv_type_signal=void])])
+AC_DEFINE_UNQUOTED([RETSIGTYPE],[$ac_cv_type_signal],[Define as the return type of signal handlers
+            ('int' or 'void').])
+
 AC_TYPE_SIZE_T
 AC_TYPE_UID_T
 AC_TYPE_SOCKETLEN_T
@@ -373,7 +395,7 @@ dnl Check for enable particular features.
 dnl
 
 AC_ARG_ENABLE(all, [
-AC_HELP_STRING([--enable-all], [Enable all optional modules])],
+AS_HELP_STRING([--enable-all],[Enable all optional modules])],
    [ if test "$enableval" = "yes" ; then
       enable_usb=yes
       enable_net=yes
@@ -404,7 +426,7 @@ esac
 
 dnl Allow user override
 AC_ARG_WITH(halpolicydir,
-   [AC_HELP_STRING([--with-halpolicydir=DIR], [HAL policy directory (default is platform dependent)])],
+   [AS_HELP_STRING([--with-halpolicydir=DIR],[HAL policy directory (default is platform dependent)])],
    HALPOLICYDIR=$withval)
 
 dnl Report result
@@ -420,23 +442,19 @@ AC_SUBST(HALPOLICYDIR)
 #--------------------------------------------------------------------
 
 AC_ARG_WITH(libwrap,
-   [AC_HELP_STRING([--with-libwrap=DIR], [Compile in libwrap (tcp_wrappers) support])],
+   [AS_HELP_STRING([--with-libwrap=DIR],[Compile in libwrap (tcp_wrappers) support])],
    [
       if test "x$withval" != "xno" ; then
          saved_LIBS="$LIBS"
          LIBS="$saved_LIBS -lwrap"
          AC_MSG_CHECKING([for libwrap])
-         AC_TRY_LINK(
-            [ #include <tcpd.h>
+         AC_LINK_IFELSE([AC_LANG_PROGRAM([[ #include <tcpd.h>
               int deny_severity = 0;
               int allow_severity = 0;
-              struct request_info *req; ],
-            [ hosts_access(req); ],
-            [ AC_MSG_RESULT([yes])
+              struct request_info *req; ]], [[ hosts_access(req); ]])],[ AC_MSG_RESULT([yes])
               AC_DEFINE(HAVE_LIBWRAP,, [Define if you have libwrap])
-              TCPW_MSG="yes" ],
-            [ LIBS="$saved_LIBS -lwrap -lnsl"
-              AC_TRY_LINK(
+              TCPW_MSG="yes" ],[ LIBS="$saved_LIBS -lwrap -lnsl"
+              _au_m4_changequote([,])AC_TRY_LINK(
                  [ #include <tcpd.h>
                    int deny_severity = 0;
                    int allow_severity = 0;
@@ -445,8 +463,8 @@ AC_ARG_WITH(libwrap,
                  [ AC_MSG_RESULT([yes])
                    AC_DEFINE(HAVE_LIBWRAP)
                    TCPW_MSG="yes" ],
-                 [AC_MSG_ERROR([*** libwrap missing]) ] ]
-              )
+                 [AC_MSG_ERROR([*** libwrap missing]) ]
+              ])
          )
       fi
    ]
@@ -461,7 +479,7 @@ CGI=
 GD_LIBS=
 SYS_GD_FOUND=no
 AC_ARG_ENABLE(cgi,
-   [AC_HELP_STRING([--enable-cgi], [Compile CGI programs])],
+   [AS_HELP_STRING([--enable-cgi],[Compile CGI programs])],
    [ if test "$enableval" = "yes"
      then
         ENABLE_CGI="yes"
@@ -530,8 +548,8 @@ dnl
 dnl Check for enable of drivers
 dnl
 AC_ARG_ENABLE(apcsmart, [
-AC_HELP_STRING([--enable-apcsmart], [Compile APC SmartUPS serial driver (default)])
-AC_HELP_STRING([--disable-apcsmart], [No APC SmartUPS serial driver])],
+AS_HELP_STRING([--enable-apcsmart],[Compile APC SmartUPS serial driver (default)])
+AS_HELP_STRING([--disable-apcsmart],[No APC SmartUPS serial driver])],
    [ if test "$enableval" = "yes" ; then
        dnl This is for C code inclusion
        AC_DEFINE(HAVE_APCSMART_DRIVER,, [Define if building apcsmart driver])
@@ -547,8 +565,8 @@ AC_HELP_STRING([--disable-apcsmart], [No APC SmartUPS serial driver])],
      APCDRVLIBS="$APCDRVLIBS \$(topdir)/src/drivers/apcsmart/libapcsmartdrv.a" ])
 
 AC_ARG_ENABLE(dumb, [
-AC_HELP_STRING([--enable-dumb], [Compile dumb UPS driver (default)])
-AC_HELP_STRING([--disable-dumb], [No dumb UPS driver])],
+AS_HELP_STRING([--enable-dumb],[Compile dumb UPS driver (default)])
+AS_HELP_STRING([--disable-dumb],[No dumb UPS driver])],
    [ if test "$enableval" = "yes" ; then
         AC_DEFINE(HAVE_DUMB_DRIVER,, [Define if building simple signaling driver])
         DUMB_DRIVER="dumb"
@@ -563,12 +581,12 @@ AC_HELP_STRING([--disable-dumb], [No dumb UPS driver])],
 dnl Allow user to force USB type to generic
 GENERICUSB="no"
 AC_ARG_WITH(generic-usb,
-[AC_HELP_STRING([--with-generic-usb], [Force use of generic USB driver]) ],
+[AS_HELP_STRING([--with-generic-usb],[Force use of generic USB driver]) ],
    [GENERICUSB="yes" ])
 
 AC_ARG_ENABLE(usb, [
-AC_HELP_STRING([--enable-usb], [Compile USB UPS code])
-AC_HELP_STRING([--disable-usb], [No USB UPS code (default)])],
+AS_HELP_STRING([--enable-usb],[Compile USB UPS code])
+AS_HELP_STRING([--disable-usb],[No USB UPS code (default)])],
    [ if test "$enableval" = "yes" ; then
       dnl USB driver is usually determined by host system.
       dnl But if user forces generic_usb then fake it out.
@@ -600,8 +618,8 @@ AC_HELP_STRING([--disable-usb], [No USB UPS code (default)])],
     [])
 
 AC_ARG_ENABLE(net, [
-AC_HELP_STRING([--enable-net], [Compile networking driver for slaves (default)])
-AC_HELP_STRING([--disable-net], [No network driver for slaves])],
+AS_HELP_STRING([--enable-net],[Compile networking driver for slaves (default)])
+AS_HELP_STRING([--disable-net],[No network driver for slaves])],
    [ if test "$enableval" = "yes" ; then
         AC_DEFINE(HAVE_NET_DRIVER,, [Define if building net driver])
         NET_DRIVER="net"
@@ -614,8 +632,8 @@ AC_HELP_STRING([--disable-net], [No network driver for slaves])],
      APCDRVLIBS="$APCDRVLIBS \$(topdir)/src/drivers/net/libnetdrv.a" ])
 
 AC_ARG_ENABLE(snmp, [
-AC_HELP_STRING([--enable-snmp], [Compile SNMP driver (default)])
-AC_HELP_STRING([--disable-snmp], [No SNMP driver])],
+AS_HELP_STRING([--enable-snmp],[Compile SNMP driver (default)])
+AS_HELP_STRING([--disable-snmp],[No SNMP driver])],
    [ if test "$enableval" = "yes" ; then
         AC_DEFINE(HAVE_SNMPLITE_DRIVER,, [Define if building snmplite driver])
         SNMPLITE_DRIVER="snmplite"
@@ -631,8 +649,8 @@ AC_HELP_STRING([--disable-snmp], [No SNMP driver])],
 
 dnl Enable test driver
 AC_ARG_ENABLE(test, [
-AC_HELP_STRING([--enable-test], [Compile TEST driver code])
-AC_HELP_STRING([--disable-test], [No TEST driver (default)])],
+AS_HELP_STRING([--enable-test],[Compile TEST driver code])
+AS_HELP_STRING([--disable-test],[No TEST driver (default)])],
    [ if test "$enableval" = "yes" ; then
         AC_DEFINE(HAVE_TEST_DRIVER,, [Define if building test driver])
         TEST_DRIVER="test"
@@ -643,8 +661,8 @@ AC_HELP_STRING([--disable-test], [No TEST driver (default)])],
 
 dnl Enable pcnet driver
 AC_ARG_ENABLE(pcnet, [
-AC_HELP_STRING([--enable-pcnet], [Compile PCNET driver code (default)])
-AC_HELP_STRING([--disable-pcnet], [No PCNET driver])],
+AS_HELP_STRING([--enable-pcnet],[Compile PCNET driver code (default)])
+AS_HELP_STRING([--disable-pcnet],[No PCNET driver])],
    [ if test "$enableval" = "yes" ; then
         AC_DEFINE(HAVE_PCNET_DRIVER,, [Define if building PCNET driver])
         PCNET_DRIVER="pcnet"
@@ -658,8 +676,8 @@ AC_HELP_STRING([--disable-pcnet], [No PCNET driver])],
 
 dnl Enable modbus USB support
 AC_ARG_ENABLE(modbus-usb, [
-AC_HELP_STRING([--enable-modbus-usb], [Compile MODBUS/USB driver code])
-AC_HELP_STRING([--disable-modbus-usb], [No MODBUS/USB driver (default)])],
+AS_HELP_STRING([--enable-modbus-usb],[Compile MODBUS/USB driver code])
+AS_HELP_STRING([--disable-modbus-usb],[No MODBUS/USB driver (default)])],
    [ if test "$enableval" = "yes" ; then
         AC_DEFINE(HAVE_MODBUS_USB_DRIVER,, [Define if building MODBUS/USB driver])
         MODBUS_USB_DRIVER="modbus-usb"
@@ -671,8 +689,8 @@ AC_HELP_STRING([--disable-modbus-usb], [No MODBUS/USB driver (default)])],
 
 dnl Enable modbus driver
 AC_ARG_ENABLE(modbus, [
-AC_HELP_STRING([--enable-modbus], [Compile MODBUS driver code (default)])
-AC_HELP_STRING([--disable-modbus], [No MODBUS driver])],
+AS_HELP_STRING([--enable-modbus],[Compile MODBUS driver code (default)])
+AS_HELP_STRING([--disable-modbus],[No MODBUS driver])],
    [ if test "$enableval" = "yes" ; then
         AC_DEFINE(HAVE_MODBUS_DRIVER,, [Define if building MODBUS driver])
         MODBUS_DRIVER="modbus"
@@ -727,14 +745,14 @@ NISSRV_ENABLED=yes
 dnl Allow setting of NISIP value
 NISIP="0.0.0.0"
 AC_ARG_WITH(nisip,
-   [AC_HELP_STRING([--with-nisip=IP-ADDRESS], [Specify the IP address to bind to (default=0.0.0.0)])],
+   [AS_HELP_STRING([--with-nisip=IP-ADDRESS],[Specify the IP address to bind to (default=0.0.0.0)])],
    [NISIP="$withval";])
 AC_SUBST(NISIP)
 
 
 CGIBIN="/etc/apcupsd"
 AC_ARG_WITH(cgi-bin,
-   [AC_HELP_STRING([--with-cgi-bin=DIR], [Specify cgi-bin directory (default=/etc/apcupsd)])],
+   [AS_HELP_STRING([--with-cgi-bin=DIR],[Specify cgi-bin directory (default=/etc/apcupsd)])],
    [CGIBIN="$withval";])
 
 dnl
@@ -743,7 +761,7 @@ dnl
 GAPCMON=
 GAPCMON_ENABLED=no
 AC_ARG_ENABLE(gapcmon,
-   [AC_HELP_STRING([--enable-gapcmon], [Build GTK/GUI front-end to apcupsd (default=no)])],
+   [AS_HELP_STRING([--enable-gapcmon],[Build GTK/GUI front-end to apcupsd (default=no)])],
    [ if test "$enableval" = "yes" ; then
       GAPCMON=gapcmon
       GAPCMON_ENABLED=yes
@@ -763,7 +781,7 @@ dnl
 APCAGENT=
 APCAGENT_ENABLED=no
 AC_ARG_ENABLE(apcagent,
-   [AC_HELP_STRING([--enable-apcagent], [Build menubar app for Mac OS X (default=no)])],
+   [AS_HELP_STRING([--enable-apcagent],[Build menubar app for Mac OS X (default=no)])],
    [ if test "$enableval" = "yes" ; then
       case $host in
       *-*-darwin*)
@@ -922,7 +940,7 @@ dnl
 
 # now allow user to specify DISTNAME
 AC_ARG_WITH(distname,
-   [AC_HELP_STRING([--with-distname=NAME], [Specify DISTNAME])],
+   [AS_HELP_STRING([--with-distname=NAME],[Specify DISTNAME])],
    [DISTNAME=$withval])
 
 if test "x$DISTNAME" != "x"
@@ -997,7 +1015,7 @@ dnl
 DISTDIR=$DISTNAME
 with_distdir="yes"
 AC_ARG_ENABLE(install-distdir,
-   [AC_HELP_STRING([--enable-install-distdir], [Install distribution])],
+   [AS_HELP_STRING([--enable-install-distdir],[Install distribution])],
    [ if test "$enableval" = "no" ; then
         DISTDIR=""
         with_distdir="no"
@@ -1248,51 +1266,51 @@ dnl
 dnl Allow user to set nologdir
 dnl
 AC_ARG_WITH(nologin,
-   [AC_HELP_STRING([--with-nologin=DIR], [Specify nologin file directory (default /etc)])],
+   [AS_HELP_STRING([--with-nologin=DIR],[Specify nologin file directory (default /etc)])],
    [ nologdir="$withval"; ])
 
 # now allow the user to specify the PID directory
 AC_ARG_WITH(pid-dir,
-    [AC_HELP_STRING([--with-pid-dir=DIR], [Specify PIDDIR directory (default is OS dependent)])],
+    [AS_HELP_STRING([--with-pid-dir=DIR],[Specify PIDDIR directory (default is OS dependent)])],
     [PIDDIR="$withval";])
 
 # now allow user to specify LOGDIR
 AC_ARG_WITH(log-dir,
-    [AC_HELP_STRING([--with-log-dir=DIR], [Specify EVENTS and STATUS directory (default is OS dependent)])],
+    [AS_HELP_STRING([--with-log-dir=DIR],[Specify EVENTS and STATUS directory (default is OS dependent)])],
     [LOGDIR="$withval";])
 
 # now allow user to specify LOCKDIR
 AC_ARG_WITH(lock-dir,
-    [AC_HELP_STRING([--with-lock-dir=DIR], [Specify serial port lock directory (default is OS dependent)])],
+    [AS_HELP_STRING([--with-lock-dir=DIR],[Specify serial port lock directory (default is OS dependent)])],
     [LOCKDIR="$withval";])
 
 # now allow user to specify PWRFAILDIR
 AC_ARG_WITH(pwrfail-dir,
-    [AC_HELP_STRING([--with-pwrfail-dir=DIR], [Specify power failure file directory (default is OS dependent)])],
+    [AS_HELP_STRING([--with-pwrfail-dir=DIR],[Specify power failure file directory (default is OS dependent)])],
     [PWRFAILDIR="$withval";])
 
 # now allow user to specify SERIALDEV
 AC_ARG_WITH(serial-dev,
-    [AC_HELP_STRING([--with-serial-dev=DEV], [Specify serial port device])],
+    [AS_HELP_STRING([--with-serial-dev=DEV],[Specify serial port device])],
     [SERIALDEV="$withval";])
 
 AC_ARG_WITH(dev,
-    [AC_HELP_STRING([--with-dev=DEV], [Specify port or device])],
+    [AS_HELP_STRING([--with-dev=DEV],[Specify port or device])],
     [SERIALDEV="$withval";])
 
 # now allow user to specify NISPORT
 AC_ARG_WITH(nis-port,
-    [AC_HELP_STRING([--with-nis-port=PORT], [Specify NIS (CGI) port (default 3551 except Debian)])],
+    [AS_HELP_STRING([--with-nis-port=PORT],[Specify NIS (CGI) port (default 3551 except Debian)])],
     [NISPORT="$withval";])
 
 # now allow user to specify UPSTYPE
 AC_ARG_WITH(upstype,
-    [AC_HELP_STRING([--with-upstype=TYPE], [Specify the UPS type])],
+    [AS_HELP_STRING([--with-upstype=TYPE],[Specify the UPS type])],
     [UPSTYPE="$withval";])
 
 # now allow user to specify UPSCABLE
 AC_ARG_WITH(upscable,
-    [AC_HELP_STRING([--with-upscable=CABLE], [Specify the UPS cable])],
+    [AS_HELP_STRING([--with-upscable=CABLE],[Specify the UPS cable])],
     [UPSCABLE="$withval";])
 
 AC_SUBST(DISTNAME)
@@ -1360,7 +1378,8 @@ then
    GENERATE_FILES="$GENERATE_FILES src/cgi/cgiconfig.h"
 fi
 
-AC_OUTPUT([ ${GENERATE_FILES} ], [])
+AC_CONFIG_FILES([ ${GENERATE_FILES} ])
+AC_OUTPUT
 
 chmod 755 examples/safe.apccontrol
 $MAKE clean
