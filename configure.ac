@@ -14,8 +14,11 @@ AC_CONFIG_SRCDIR([Developers])
 dnl Config header file.
 AC_CONFIG_HEADERS([include/apcconfig.h:autoconf/config.h.in])
 
+AC_CONFIG_MACRO_DIRS([m4])
+
 topdir=`pwd`
-AC_CONFIG_AUX_DIR(${topdir}/autoconf)
+AC_CONFIG_AUX_DIR([build-aux])
+
 
 dnl
 dnl Absolute srcdir
