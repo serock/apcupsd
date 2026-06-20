@@ -1,13 +1,13 @@
-/* autoconf/config.h.in.  Generated from autoconf/configure.in by autoheader.  */
+/* autoconf/config.h.in.  Generated from configure.ac by autoheader.  */
 
-/* Define to the type of elements in the array set by `getgroups'. Usually
-   this is either `int' or `gid_t'. */
+/* Define to the type of elements in the array argument to 'getgroups'.
+   Usually this is either 'int' or 'gid_t'. */
 #undef GETGROUPS_T
 
-/* Define to 1 if you have the `abort' function. */
+/* Define to 1 if you have the 'abort' function. */
 #undef HAVE_ABORT
 
-/* Define to 1 if you have the `accept4' function. */
+/* Define to 1 if you have the 'accept4' function. */
 #undef HAVE_ACCEPT4
 
 /* Define if building for AIX */
@@ -25,7 +25,7 @@
 /* Define if building for BSDi */
 #undef HAVE_BSDI_OS
 
-/* Define to 1 if you have the `calloc' function. */
+/* Define to 1 if you have the 'calloc' function. */
 #undef HAVE_CALLOC
 
 /* Define to 1 if you have the <ctype.h> header file. */
@@ -34,7 +34,7 @@
 /* Define if building for Darwin */
 #undef HAVE_DARWIN_OS
 
-/* Define to 1 if you have the declaration of `tzname', and to 0 if you don't.
+/* Define to 1 if you have the declaration of 'tzname', and to 0 if you don't.
    */
 #undef HAVE_DECL_TZNAME
 
@@ -47,7 +47,7 @@
 /* Define to 1 if you have the <fcntl.h> header file. */
 #undef HAVE_FCNTL_H
 
-/* Define to 1 if you have the `fork' function. */
+/* Define to 1 if you have the 'fork' function. */
 #undef HAVE_FORK
 
 /* Define if building for FreeBSD */
@@ -65,10 +65,13 @@
 /* Define for 6 argument version of gethostbyname_r */
 #undef HAVE_FUNC_GETHOSTBYNAME_R_6
 
+/* Define to 1 if you have some form of gethostbyname_r(). */
+#undef HAVE_GETHOSTBYNAME_R
+
 /* Define if you have getoptlong */
 #undef HAVE_GETOPTLONG
 
-/* Define to 1 if you have the `getpid' function. */
+/* Define to 1 if you have the 'getpid' function. */
 #undef HAVE_GETPID
 
 /* Define if building for HPUX */
@@ -80,13 +83,13 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
-/* Define to 1 if you have the `ioctl' function. */
+/* Define to 1 if you have the 'ioctl' function. */
 #undef HAVE_IOCTL
 
-/* Define to 1 if you have the `kill' function. */
+/* Define to 1 if you have the 'kill' function. */
 #undef HAVE_KILL
 
-/* Define to 1 if you have the `socket' library (-lsocket). */
+/* Define to 1 if you have the 'socket' library (-lsocket). */
 #undef HAVE_LIBSOCKET
 
 /* Define if you have libwrap */
@@ -103,9 +106,6 @@
 
 /* Define if you have memmove */
 #undef HAVE_MEMMOVE
-
-/* Define to 1 if you have the <memory.h> header file. */
-#undef HAVE_MEMORY_H
 
 /* Define if building for MINGW */
 #undef HAVE_MINGW
@@ -155,19 +155,19 @@
 /* Define if building for QNX */
 #undef HAVE_QNX_OS
 
-/* Define to 1 if you have the `rewind' function. */
+/* Define to 1 if you have the 'rewind' function. */
 #undef HAVE_REWIND
 
-/* Define to 1 if you have the `select' function. */
+/* Define to 1 if you have the 'select' function. */
 #undef HAVE_SELECT
 
-/* Define to 1 if you have the `setsid' function. */
+/* Define to 1 if you have the 'setsid' function. */
 #undef HAVE_SETSID
 
 /* Define if building for IRIX */
 #undef HAVE_SGI_OS
 
-/* Define to 1 if you have the `signal' function. */
+/* Define to 1 if you have the 'signal' function. */
 #undef HAVE_SIGNAL
 
 /* Define to 1 if you have the <signal.h> header file. */
@@ -176,7 +176,7 @@
 /* Define if building snmplite driver */
 #undef HAVE_SNMPLITE_DRIVER
 
-/* Define to 1 if you have the `snprintf' function. */
+/* Define to 1 if you have the 'snprintf' function. */
 #undef HAVE_SNPRINTF
 
 /* Define to 1 if you have the <stdarg.h> header file. */
@@ -194,10 +194,10 @@
 /* Define if you have strcasecmp */
 #undef HAVE_STRCASECMP
 
-/* Define to 1 if you have the `strerror' function. */
+/* Define to 1 if you have the 'strerror' function. */
 #undef HAVE_STRERROR
 
-/* Define to 1 if you have the `strftime' function. */
+/* Define to 1 if you have the 'strftime' function. */
 #undef HAVE_STRFTIME
 
 /* Define to 1 if you have the <strings.h> header file. */
@@ -206,22 +206,22 @@
 /* Define to 1 if you have the <string.h> header file. */
 #undef HAVE_STRING_H
 
-/* Define to 1 if you have the `strlcat' function. */
+/* Define to 1 if you have the 'strlcat' function. */
 #undef HAVE_STRLCAT
 
-/* Define to 1 if you have the `strlcpy' function. */
+/* Define to 1 if you have the 'strlcpy' function. */
 #undef HAVE_STRLCPY
 
-/* Define to 1 if you have the `strncmp' function. */
+/* Define to 1 if you have the 'strncmp' function. */
 #undef HAVE_STRNCMP
 
-/* Define to 1 if you have the `strncpy' function. */
+/* Define to 1 if you have the 'strncpy' function. */
 #undef HAVE_STRNCPY
 
 /* Define if you have strstr */
 #undef HAVE_STRSTR
 
-/* Define to 1 if `tm_zone' is member of `struct tm'. */
+/* Define to 1 if 'tm_zone' is a member of 'struct tm'. */
 #undef HAVE_STRUCT_TM_TM_ZONE
 
 /* Define if building for SunOS */
@@ -239,13 +239,16 @@
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #undef HAVE_SYS_STAT_H
 
+/* Define to 1 if you have the <sys/time.h> header file. */
+#undef HAVE_SYS_TIME_H
+
 /* Define to 1 if you have the <sys/types.h> header file. */
 #undef HAVE_SYS_TYPES_H
 
 /* Define to 1 if you have <sys/wait.h> that is POSIX.1 compatible. */
 #undef HAVE_SYS_WAIT_H
 
-/* Define to 1 if you have the `tcgetattr' function. */
+/* Define to 1 if you have the 'tcgetattr' function. */
 #undef HAVE_TCGETATTR
 
 /* Define to 1 if you have the <termios.h> header file. */
@@ -254,12 +257,12 @@
 /* Define if building test driver */
 #undef HAVE_TEST_DRIVER
 
-/* Define to 1 if your `struct tm' has `tm_zone'. Deprecated, use
-   `HAVE_STRUCT_TM_TM_ZONE' instead. */
+/* Define to 1 if your 'struct tm' has 'tm_zone'. Deprecated, use
+   'HAVE_STRUCT_TM_TM_ZONE' instead. */
 #undef HAVE_TM_ZONE
 
-/* Define to 1 if you don't have `tm_zone' but do have the external array
-   `tzname'. */
+/* Define to 1 if you don't have 'tm_zone' but do have the external array
+   'tzname'. */
 #undef HAVE_TZNAME
 
 /* Define to 1 if you have the <unistd.h> header file. */
@@ -268,19 +271,19 @@
 /* Define if building USB driver */
 #undef HAVE_USB_DRIVER
 
-/* Define to 1 if you have the `vfprintf' function. */
+/* Define to 1 if you have the 'vfprintf' function. */
 #undef HAVE_VFPRINTF
 
-/* Define to 1 if you have the `vsnprintf' function. */
+/* Define to 1 if you have the 'vsnprintf' function. */
 #undef HAVE_VSNPRINTF
 
-/* Define to 1 if you have the `wait' function. */
+/* Define to 1 if you have the 'wait' function. */
 #undef HAVE_WAIT
 
-/* Define to 1 if you have the `wait3' function. */
+/* Define to 1 if you have the 'wait3' function. */
 #undef HAVE_WAIT3
 
-/* Define to 1 if you have the `waitpid' function. */
+/* Define to 1 if you have the 'waitpid' function. */
 #undef HAVE_WAITPID
 
 /* Name of system on which apcupsd will run */
@@ -307,6 +310,9 @@
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
 
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
+
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
@@ -316,13 +322,12 @@
 /* Default directory in which powerfail flag file is written */
 #undef PWRFAILDIR
 
-/* Define as the return type of signal handlers (`int' or `void'). */
-#undef RETSIGTYPE
-
-/* Define to 1 if the `S_IS*' macros in <sys/stat.h> do not work properly. */
+/* Define to 1 if the 'S_IS*' macros in <sys/stat.h> do not work properly. */
 #undef STAT_MACROS_BROKEN
 
-/* Define to 1 if you have the ANSI C header files. */
+/* Define to 1 if all of the C89 standard headers exist (not just the ones
+   required in a freestanding environment). This macro is provided for
+   backward compatibility; new code need not use it. */
 #undef STDC_HEADERS
 
 /* Default directory in which apcupsd config files are stored */
@@ -334,29 +339,29 @@
 /* Define if you have gdImagePng in libgd */
 #undef SYS_IMGFMT_PNG
 
-/* Define to 1 if you can safely include both <sys/time.h> and <time.h>. */
-#undef TIME_WITH_SYS_TIME
-
-/* Define to 1 if your <sys/time.h> declares `struct tm'. */
+/* Define to 1 if your <sys/time.h> declares 'struct tm'. */
 #undef TM_IN_SYS_TIME
 
 /* Define to 1 if the X Window System is missing or not being used. */
 #undef X_DISPLAY_MISSING
 
-/* Define to `int' if <sys/types.h> doesn't define. */
+/* Define as 'int' if <sys/types.h> doesn't define. */
 #undef gid_t
 
-/* Define to `int' if <sys/types.h> does not define. */
+/* Define to 'int' if <sys/types.h> does not define. */
 #undef mode_t
 
-/* Define to `long int' if <sys/types.h> does not define. */
+/* Define to 'long int' if <sys/types.h> does not define. */
 #undef off_t
 
-/* Define to `int' if <sys/types.h> does not define. */
+/* Define as a signed integer type capable of holding a process identifier. */
 #undef pid_t
 
-/* Define to `unsigned int' if <sys/types.h> does not define. */
+/* Define as 'unsigned int' if <stddef.h> doesn't define. */
 #undef size_t
 
-/* Define to `int' if <sys/types.h> doesn't define. */
+/* Define base type for socklen_t if needed */
+#undef socklen_t
+
+/* Define as 'int' if <sys/types.h> doesn't define. */
 #undef uid_t
