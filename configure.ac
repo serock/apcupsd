@@ -21,11 +21,16 @@ AC_CONFIG_SRCDIR([Developers])
 dnl Config header file.
 AC_CONFIG_HEADERS([include/apcconfig.h:autoconf/config.h.in])
 
+AC_CONFIG_FILES([Makefile src/gapcmon/Makefile])
+
 AC_CONFIG_MACRO_DIRS([m4])
 
 topdir=`pwd`
 AC_CONFIG_AUX_DIR([build-aux])
 
+AM_INIT_AUTOMAKE([-Wall -Werror foreign])
+
+GLIB_GSETTINGS
 
 dnl
 dnl Absolute srcdir

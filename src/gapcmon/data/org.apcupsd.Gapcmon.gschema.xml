@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.apcupsd.Gapcmon" path="/org/apcupsd/gapcmon/">
+    <child name="controller" schema="org.apcupsd.Gapcmon.controller"/>
+    <child name="monitors" schema="org.apcupsd.Gapcmon.monitors"/>
+    <key name="monitor-names" type="as">
+      <default>[]</default>
+    </key>
+  </schema>
+
+  <schema id="org.apcupsd.Gapcmon.controller" path="/org/apcupsd/gapcmon/controller/">
+    <key name="color-battv" type="s">
+      <default>'#000000'</default>
+    </key>
+    <key name="color-bcharge" type="s">
+      <default>'#ffff00'</default>
+    </key>
+    <key name="color-chart" type="s">
+      <default>'#add8e6'</default>
+    </key>
+    <key name="color-linev" type="s">
+      <default>'#008000'</default>
+    </key>
+    <key name="color-loadpct" type="s">
+      <default>'#0000ff'</default>
+    </key>
+    <key name="color-timeleft" type="s">
+      <default>'#ff0000'</default>
+    </key>
+    <key name="color-title" type="s">
+      <default>'#0000ff'</default>
+    </key>
+    <key name="color-window" type="s">
+      <default>'#ffffff'</default>
+    </key>
+    <key name="use-systray" type="b">
+      <default>false</default>
+    </key>
+  </schema>
+
+  <schema id="org.apcupsd.Gapcmon.monitor">
+    <key name="enabled" type="b">
+      <default>false</default>
+    </key>
+    <key name="graph-interval" type="d">
+      <default>30</default>
+    </key>
+    <key name="host-name" type="s">
+      <default>'localhost'</default>
+    </key>
+    <key name="network-interval" type="d">
+      <default>8</default>
+    </key>
+    <key name="port-number" type="q">
+      <default>3551</default>
+    </key>
+    <key name="ups-wattage" type="q">
+      <default>600</default>
+    </key>
+    <key name="use-systray" type="b">
+      <default>false</default>
+    </key>
+  </schema>
+
+  <schema id="org.apcupsd.Gapcmon.monitors" path="/org/apcupsd/gapcmon/monitors:/" list-of="org.apcupsd.Gapcmon.monitor"/>
+</schemalist>
