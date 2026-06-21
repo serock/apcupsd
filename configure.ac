@@ -1417,7 +1417,7 @@ $MAKE clean
 # A whole lot of hand springs to get the compiler version.
 #  This is because gcc changed the output in version 3.0
 #
-CXXVERSION=`${CXX} --version | tr '\n' ' ' | cut -f 3 -d ' '`
+CXXVERSION=`${CXX} --version | sed ['s/([^)]*)//'] | awk '{ print $2; exit }'`
 if test "x${CXXVERSION}" = "x" ; then
    CXXVERSION=`${CXX} --version | tr '\n' ' ' | cut -f 1 -d ' '`
 fi
