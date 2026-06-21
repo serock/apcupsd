@@ -4,11 +4,18 @@ dnl Copyright (C) 1999-2000 Riccardo Facchetti <riccardo@master.oasi.gpa.it>
 dnl Copyright (C) 2003-2014 Adam Kropelin <adam@kroptech.com>
 dnl
 dnl Process this file with autoconf to produce a configure script.
-dnl Process this file with autoheader to produce a config.h.in
+dnl Process the directory of this file with autoreconf --force --install
+dnl   to produce an aclocal.m4, config.h.in, config.guess, config.sub,
+dnl   install-sh, and configure script.
 dnl
 
+AC_PREREQ([2.70])
+
+m4_pattern_forbid([^APC_[A-Z_]+])
+
+AC_INIT([apcupsd], [3.14.14])
+
 dnl A distinctive file to look for in srcdir.
-AC_INIT
 AC_CONFIG_SRCDIR([Developers])
 
 dnl Config header file.
