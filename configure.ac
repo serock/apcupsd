@@ -221,7 +221,7 @@ AC_PATH_PROG(RST2PDF, rst2pdf,)
 # -------------------------------------------------------------------------
 #  If the user has not set --mandir, we default to /usr/share/man
 # -------------------------------------------------------------------------
-if test x$mandir = x'${prefix}/man' ; then
+if test x$mandir = x'${datarootdir}/man' ; then
    mandir=/usr/share/man
 fi
 
