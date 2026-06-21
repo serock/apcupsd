@@ -782,7 +782,7 @@ AC_ARG_ENABLE(gapcmon,
       dnl
       dnl Check for Gnome packages
       dnl
-      PKG_CHECK_MODULES(GAPCMON, gtk+-2.0 >= 2.4.0 glib-2.0 gthread-2.0 gconf-2.0)
+      PKG_CHECK_MODULES(GAPCMON, gtk+-2.0 >= 2.24.33 glib-2.0 >= 2.55.1 gthread-2.0)
       GAPCMON_CFLAGS="$GAPCMON_CFLAGS -DVERSION=\\\"$VERSION\\\""
    fi],
   [])
