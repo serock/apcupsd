@@ -1018,6 +1018,17 @@ then
 elif test -f /etc/engarde-version
 then
    DISTNAME=engarde
+elif test -f /etc/os-release
+then
+   DISTNAME=`cat /etc/os-release | grep "^ID=" | cut -f 2 -d '"'`
+   case "$DISTNAME" in
+   sles | opensuse-leap | opensuse-tumbleweed | sl-micro)
+      DISTNAME=suse
+      ;;
+   *)
+      DISTNAME=unknown
+      ;;
+   esac
 else
    DISTNAME=unknown
 fi
@@ -1223,7 +1234,12 @@ sun)
       platforms/sun/apccontrol"
    ;;
 suse)
-   DISTVER=`cat /etc/SuSE-release |grep VERSION| cut -f 3 -d ' '`
+   if test -f /etc/os-release
+   then
+      DISTVER=`cat /etc/os-release | grep "^VERSION_ID=" | cut -f 2 -d '"'`
+   else
+      DISTVER=`cat /etc/SuSE-release |grep VERSION| cut -f 3 -d ' '`
+   fi
    DFILES="\
       platforms/suse/apcupsd \
       platforms/suse/awkhaltprog"
