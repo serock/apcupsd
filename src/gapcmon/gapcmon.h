@@ -362,7 +362,6 @@ typedef struct _System_Control_Data {
    gboolean b_run;                 /* operational flag */
    GSettings *app_settings;
    GSettings *controller_settings;
-   // XXX guint i_group_id;               /* GCONF dir notify ids - controller */
    // XXX guint i_prefs_id;               /* GCONF dir notify ids - prefs-view */
 
    GtkWidget *window;
@@ -393,16 +392,6 @@ typedef struct _System_Control_Data {
    GHashTable *pht_Status;         /* hashtable holding status text  */
    guint i_info_context;           /* StatusBar Context */
    GdkPixbuf *my_icons[GAPC_N_ICONS + 8];
-
-   /* Global graph properties */
-   GdkColor    color_linev;
-   GdkColor    color_loadpct;
-   GdkColor    color_timeleft;
-   GdkColor    color_bcharge;
-   GdkColor    color_battv;
-   GdkColor    color_window;
-   GdkColor    color_chart;
-   GdkColor    color_title;
 
 } GAPC_CONFIG, *PGAPC_CONFIG;
 
