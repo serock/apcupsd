@@ -1,6 +1,6 @@
 /* gapcmon.h               serial-0087-0 ************************************
 
-  GKT+ GUI with Notification Area (System Tray) support.  Program  for 
+  GKT+ GUI with Notification Area (System Tray) support.  Program  for
   monitoring the apcupsd.sourceforge.net package.
   Copyright (C) 2006 James Scott, Jr. <skoona@users.sourceforge.net>
 
@@ -40,28 +40,34 @@ G_BEGIN_DECLS
 #define GAPC_PROG_NAME    "gapcmon"
 #define GAPC_GROUP_TITLE "<i>  Uninterruptible Power Supply Monitor...</i>\n  for APCUPSD"
 #define GAPC_WINDOW_TITLE  "gapcmon: UPS Information Panels"
-#define GAPC_CP_GROUP_KEY    "/apps/gapcmon/controller"
-#define GAPC_CP_SYSTRAY_KEY  "/apps/gapcmon/controller/use_systray"
-#define GAPC_CP_PAGERS_KEY   "/apps/gapcmon/controller/skip_pagers"
 
-#define GAPC_COLOR_LINEV_KEY "/apps/gapcmon/controller/color_linev"
-#define GAPC_COLOR_LOADPCT_KEY "/apps/gapcmon/controller/color_loadpct"
-#define GAPC_COLOR_TIMELEFT_KEY "/apps/gapcmon/controller/color_timeleft"
-#define GAPC_COLOR_BCHARGE_KEY "/apps/gapcmon/controller/color_bcharge"
-#define GAPC_COLOR_BATTV_KEY "/apps/gapcmon/controller/color_battv"
-#define GAPC_COLOR_WINDOW_KEY "/apps/gapcmon/controller/color_window"
-#define GAPC_COLOR_CHART_KEY "/apps/gapcmon/controller/color_chart"
-#define GAPC_COLOR_TITLE_KEY "/apps/gapcmon/controller/color_title"
+#define GAPC_APP_SCHEMA_ID        "org.apcupsd.Gapcmon"
+#define GAPC_CONTROLLER_SCHEMA_ID "org.apcupsd.Gapcmon.controller"
+#define GAPC_MONITOR_SCHEMA_ID    "org.apcupsd.Gapcmon.monitor"
 
-#define GAPC_MID_GROUP_KEY   "/apps/gapcmon/monitor"
-#define GAPC_ENABLE_KEY      "/apps/gapcmon/monitor/%d/enabled"
-#define GAPC_SYSTRAY_KEY     "/apps/gapcmon/monitor/%d/use_systray"
-#define GAPC_PAGER_KEY       "/apps/gapcmon/monitor/%d/skip_pagers"     /* not used */
-#define GAPC_PORT_KEY        "/apps/gapcmon/monitor/%d/port_number"
-#define GAPC_REFRESH_KEY     "/apps/gapcmon/monitor/%d/network_interval"
-#define GAPC_GRAPH_KEY       "/apps/gapcmon/monitor/%d/graph_interval"
-#define GAPC_HOST_KEY        "/apps/gapcmon/monitor/%d/host_name"
-#define GAPC_WATT_KEY        "/apps/gapcmon/monitor/%d/ups_wattage"
+#define GAPC_MONITOR_NAME_FORMAT "%04hx"
+#define GAPC_MONITOR_PATH_FORMAT "/org/apcupsd/gapcmon/monitors:/" GAPC_MONITOR_NAME_FORMAT "/"
+
+#define GAPC_MONITOR_NAMES_KEY  "monitor-names"
+
+#define GAPC_COLOR_LINEV_KEY    "color-linev"
+#define GAPC_COLOR_LOADPCT_KEY  "color-loadpct"
+#define GAPC_COLOR_TIMELEFT_KEY "color-timeleft"
+#define GAPC_COLOR_BCHARGE_KEY  "color-bcharge"
+#define GAPC_COLOR_BATTV_KEY    "color-battv"
+#define GAPC_COLOR_WINDOW_KEY   "color-window"
+#define GAPC_COLOR_CHART_KEY    "color-chart"
+#define GAPC_COLOR_TITLE_KEY    "color-title"
+
+#define GAPC_SYSTRAY_KEY        "use-systray"
+
+#define GAPC_ENABLE_KEY         "enabled"
+#define GAPC_PORT_KEY           "port-number"
+#define GAPC_REFRESH_KEY        "network-interval"
+#define GAPC_GRAPH_KEY          "graph-interval"
+#define GAPC_HOST_KEY           "host-name"
+#define GAPC_WATT_KEY           "ups-wattage"
+
 #define GAPC_MAX_ARRAY 256         /* for arrays or lists */
 #define GAPC_MAX_TEXT 256          /* for strings */
 #define GAPC_ICON_SIZE 24          /* Ideal size of icons */
@@ -84,32 +90,32 @@ G_BEGIN_DECLS
 #define SKNET_STR_ARRAY   256
 
 typedef struct _SKNET_Control_Data {
-  gint        cb_id;           
+  gint        cb_id;
   GIOChannel *ioc;                                 /* socket io channel */
   gint        fd_server;                           /* our local server-socket */
-  gint        i_port;                              /* dest host port */   
+  gint        i_port;                              /* dest host port */
   gboolean    b_network_control;                   /* TRUE signals resolve address needed */
   gchar       ch_ip_string[SKNET_STR_ARRAY];       /* dest host ip addr or dns name */
-  gchar       ch_ip_client[SKNET_STR_ARRAY];       /* incoming host ip addr or dns name */  
-  gchar       ch_ip_client_port[SKNET_STR_ARRAY];  /* incoming host ip port */  
+  gchar       ch_ip_client[SKNET_STR_ARRAY];       /* incoming host ip addr or dns name */
+  gchar       ch_ip_client_port[SKNET_STR_ARRAY];  /* incoming host ip port */
   gchar       ch_session_message[SKNET_HUGE_ARRAY];
   gchar       ch_error_msg[SKNET_REG_ARRAY];
   gpointer    gip;                                 /* struct sockaddr_in -- resolved tcp-ip address */
-  gpointer    gp_reserved;                         /*  reserved private pointer for me */  
+  gpointer    gp_reserved;                         /*  reserved private pointer for me */
   gpointer    gp_user_data;                        /*  private pointer for YOU or user */
-  gint        i_byte_counter;                      /* public byte counter */  
+  gint        i_byte_counter;                      /* public byte counter */
 } SKNET_COMMS, *PSKCOMM;
 
 typedef enum _Control_Block_id {
     CB_SERIES_ID,
     CB_RANGE_ID,
     CB_GRAPH_ID,
-    CB_HISTORY_ID,    
-    CB_MONITOR_ID,    
-    CB_CONTROL_ID,    
-    CB_COLUMN_ID,   
+    CB_HISTORY_ID,
+    CB_MONITOR_ID,
+    CB_CONTROL_ID,
+    CB_COLUMN_ID,
     CB_SUMM_ID,
-    CB_PSKCOMM_ID,      
+    CB_PSKCOMM_ID,
     CB_N_ID
 } GAPCDataID;
 
@@ -166,7 +172,6 @@ typedef struct _Prefs_Column_Data {
    GAPCDataID cb_id;               /* This is REQUIRED TO BE 1ST in struct */
    guint cb_monitor_num;           /* monitor number 1-based */
    guint i_col_num;
-   GConfClient *client;
    GtkTreeModel *prefs_model;      /* GtkListStore */
 
 } GAPC_PREFS_COLUMN, *PGAPC_PREFS_COLUMN;
@@ -175,7 +180,6 @@ typedef struct _Monitor_Column_Data {
    GAPCDataID cb_id;                  /* This is REQUIRED TO BE 1ST in struct */
    guint cb_monitor_num;           /* monitor number 1-based */
    guint i_col_num;
-   GConfClient *client;
    GtkTreeModel *monitor_model;    /* GtkListStore */
 
 } GAPC_MON_COLUMN, *PGAPC_MON_COLUMN;
@@ -295,7 +299,7 @@ typedef struct _Monitor_Instance_Data {
    gboolean cb_use_systray;
    gchar *pch_host;
    gint i_port;
-   gint i_watt;                    /* rated wattage of UPS*/   
+   gint i_watt;                    /* rated wattage of UPS*/
    gfloat d_refresh;
    gfloat d_graph;                 /* End Preference values */
 
@@ -342,7 +346,7 @@ typedef struct _Monitor_Instance_Data {
    gchar *pach_status[GAPC_MAX_ARRAY];  /* Holds line of status text */
    gchar *pach_events[GAPC_MAX_ARRAY];  /* Holds line of event text */
 
-   GConfClient *client;            /* GCONF id */
+   GSettings *monitor_settings;
    gpointer *gp;                   /* assumed to point to pcfg */
    GtkTreeModel *monitor_model;    /* GtkListStore */
    GAPC_HISTORY phs;               /* structure for history notebook page */
@@ -354,13 +358,12 @@ typedef struct _System_Control_Data {
    GAPCDataID cb_id;                  /* This is REQUIRED TO BE 1ST in struct  */
    GList *cb_glist_monitors;       /* assumed to point to  PGAPC_MONITOR */
    guint cb_last_monitor;          /* last selected from icon list - 1-based */
-   gboolean b_use_systray;         /* gconf parms */
    gboolean b_tooltips;
    gboolean b_run;                 /* operational flag */
-   gchar *pch_gkeys[GAPC_N_PREFS_COLUMNS];
-   GConfClient *client;            /* GCONF id */
-   guint i_group_id;               /* GCONF dir notify ids - controller */
-   guint i_prefs_id;               /* GCONF dir notify ids - prefs-view */
+   GSettings *app_settings;
+   GSettings *controller_settings;
+   // XXX guint i_group_id;               /* GCONF dir notify ids - controller */
+   // XXX guint i_prefs_id;               /* GCONF dir notify ids - prefs-view */
 
    GtkWidget *window;
    GtkWidget *menu;                /* Popup Menu */
@@ -370,7 +373,7 @@ typedef struct _System_Control_Data {
    GtkTreeView *prefs_treeview;
    GtkTreeSelection *prefs_select;
    guint prefs_last_monitor;       /* assigning monitor numbers */
-   gint cb_last_monitor_deleted;   /* overide gconf inconsistency on kde */
+   guint cb_last_monitor_deleted;  // XXX /* overide gconf inconsistency on kde */
 
    GtkTreeModel *monitor_model;    /* GtkListStore */
    GtkTreeView *monitor_treeview;
@@ -393,13 +396,13 @@ typedef struct _System_Control_Data {
 
    /* Global graph properties */
    GdkColor    color_linev;
-   GdkColor    color_loadpct;   
-   GdkColor    color_timeleft;   
+   GdkColor    color_loadpct;
+   GdkColor    color_timeleft;
    GdkColor    color_bcharge;
    GdkColor    color_battv;
    GdkColor    color_window;
-   GdkColor    color_chart;   
-   GdkColor    color_title;   
+   GdkColor    color_chart;
+   GdkColor    color_title;
 
 } GAPC_CONFIG, *PGAPC_CONFIG;
 
