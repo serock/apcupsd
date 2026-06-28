@@ -134,9 +134,9 @@ static gint lg_graph_draw_horizontal_text (PLGRAPH plg,
 static gint lg_graph_draw_vertical_text (PLGRAPH plg,
                                          gchar * pch_text,
                                          GdkRectangle * rect, gboolean redraw_control);
-static gint lg_graph_draw (PLGRAPH plg);
-static gint lg_graph_configure_event_cb (GtkWidget * widget,
-                                         GdkEventConfigure * event, PLGRAPH plg);
+static gboolean lg_graph_draw (PLGRAPH plg);
+static gboolean lg_graph_configure_event_cb (GtkWidget * widget,
+                                             GdkEventConfigure * event, PLGRAPH plg);
 static gint lg_graph_expose_event_cb (GtkWidget * widget, GdkEventExpose * event,
                                       PLGRAPH plg);
 static gboolean lg_graph_motion_notify_event_cb (GtkWidget * widget, GdkEventMotion * ev,
@@ -154,12 +154,12 @@ static void gapc_util_text_view_append(GtkWidget * view, gchar * pch);
 static void gapc_util_text_view_prepend(GtkWidget * view, gchar * pch);
 static gboolean gapc_util_text_view_clear_buffer(GtkWidget * view);
 static gboolean gapc_util_treeview_get_iter_from_monitor(GtkTreeModel * model,
-   GtkTreeIter * iter, gint i_value);
+   GtkTreeIter * iter, guint i_value);
 static gint gapc_util_update_hashtable(PGAPC_MONITOR pm, gchar * pch_unparsed);
 static void cb_panel_systray_icon_destroy(GtkObject * object, gpointer gp);
 static void cb_main_interface_button_quit(GtkWidget * button, PGAPC_CONFIG pcfg);
-static void gapc_monitor_interface_destroy(PGAPC_CONFIG pcfg, gint i_monitor);
-static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, gint i_monitor,
+static void gapc_monitor_interface_destroy(PGAPC_CONFIG pcfg, guint i_monitor);
+static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, guint i_monitor,
    GtkTreeIter * iter);
 static void cb_panel_monitor_list_activated(GtkTreeView * treeview,
    GtkTreePath * arg1, GtkTreeViewColumn * arg2, PGAPC_CONFIG pcfg);
@@ -364,7 +364,7 @@ static gboolean lg_graph_data_series_add_value (PLGRAPH plg, gint i_series_numbe
 
 /*
  * A shutdown routine
- * destroys all the data series and any assocaited dynamic data
+ * destroys all the data series and any associated dynamic data
 */
 static gboolean lg_graph_data_series_remove_all (PLGRAPH plg)
 {
@@ -378,9 +378,9 @@ static gboolean lg_graph_data_series_remove_all (PLGRAPH plg)
     while (data_sets)
     {
         psd = data_sets->data;
-        g_free (psd->lg_point_dvalue);
-        g_free (psd->point_pos);
-        g_free (psd);
+        g_clear_pointer (&psd->lg_point_dvalue, g_free);
+        g_clear_pointer (&psd->point_pos, g_free);
+        g_clear_pointer (&psd, g_free);
         data_sets = g_list_next (data_sets);
         i_count++;
     }
@@ -447,30 +447,24 @@ static void lg_graph_set_x_label_text (PLGRAPH plg, gchar * pch_text)
 {
     g_return_if_fail (plg != NULL);
 
-    if (plg->x_label_text != NULL)
-    {
-        g_free (plg->x_label_text);
-    }
+    g_clear_pointer (&plg->x_label_text, g_free);
+
     plg->x_label_text = g_strdup (pch_text);
 }
 static void lg_graph_set_y_label_text (PLGRAPH plg, gchar * pch_text)
 {
     g_return_if_fail (plg != NULL);
 
-    if (plg->y_label_text != NULL)
-    {
-        g_free (plg->y_label_text);
-    }
+    g_clear_pointer (&plg->y_label_text, g_free);
+
     plg->y_label_text = g_strdup (pch_text);
 }
 static void lg_graph_set_chart_title (PLGRAPH plg, gchar * pch_text)
 {
     g_return_if_fail (plg != NULL);
 
-    if (plg->x_title_text != NULL)
-    {
-        g_free (plg->x_title_text);
-    }
+    g_clear_pointer (&plg->x_title_text, g_free);
+
     plg->x_title_text = g_strdup (pch_text);
 }
 static void lg_graph_set_chart_window_bg_color (PLGRAPH plg, gchar * pch_color)
@@ -774,8 +768,8 @@ static gint lg_graph_draw_grid_lines (PLGRAPH plg)
                                 2, GDK_LINE_SOLID, GDK_CAP_ROUND, GDK_JOIN_BEVEL);
     gdk_draw_segments (plg->pixmap, plg->window_gc, seg_major, count_major - 1);
 
-    g_free (seg_minor);
-    g_free (seg_major);
+    g_clear_pointer (&seg_minor, g_free);
+    g_clear_pointer (&seg_major, g_free);
 
     count_major = plg->x_range.i_num_major;
     count_minor = plg->x_range.i_num_minor;
@@ -819,8 +813,8 @@ static gint lg_graph_draw_grid_lines (PLGRAPH plg)
                                 2, GDK_LINE_SOLID, GDK_CAP_ROUND, GDK_JOIN_BEVEL);
     gdk_draw_segments (plg->pixmap, plg->window_gc, seg_major, count_major - 1);
 
-    g_free (seg_minor);
-    g_free (seg_major);
+    g_clear_pointer (&seg_minor, g_free);
+    g_clear_pointer (&seg_major, g_free);
 
     return TRUE;
 }
@@ -1227,16 +1221,16 @@ static void lg_graph_set_ranges (PLGRAPH plg,
  *
  * data - widget to repaint
  */
-static gint lg_graph_draw (PLGRAPH plg)
+static gboolean lg_graph_draw (PLGRAPH plg)
 {
     GtkWidget  *drawing_area = NULL;
 
-    g_return_val_if_fail (plg != NULL, TRUE);
+    g_return_val_if_fail (plg != NULL, G_SOURCE_CONTINUE);
 
     drawing_area = plg->drawing_area;
 
     if ( !(GTK_WIDGET_DRAWABLE (drawing_area)) ) {
-        return TRUE;
+        return G_SOURCE_CONTINUE;
     }
 
     /*
@@ -1297,7 +1291,7 @@ static gint lg_graph_draw (PLGRAPH plg)
      */
     lg_graph_redraw (plg);
 
-    return (FALSE);
+    return G_SOURCE_REMOVE;
 }
 
 /*
@@ -1307,8 +1301,8 @@ static gint lg_graph_draw (PLGRAPH plg)
  * Of course, this is called whenever the window is
  * resized.  We have to free up things we allocated.
  */
-static gint lg_graph_configure_event_cb (GtkWidget * widget,
-                                         GdkEventConfigure * event, PLGRAPH plg)
+static gboolean lg_graph_configure_event_cb (GtkWidget * widget,
+                                             GdkEventConfigure * event, PLGRAPH plg)
 {
     GdkRectangle clip_area;
     gint        xfactor = 0, yfactor = 0;
@@ -1408,7 +1402,6 @@ static void cb_util_popup_menu_response_exit(GtkWidget * widget, gpointer gp)
 {
    PGAPC_CONFIG pcfg = NULL;
    PGAPC_MONITOR pm = NULL;
-   gchar *penabled = NULL;
 
    g_return_if_fail(gp != NULL);
 
@@ -1416,15 +1409,12 @@ static void cb_util_popup_menu_response_exit(GtkWidget * widget, gpointer gp)
       /* this is a monitor struct (2) */
       pm = (PGAPC_MONITOR) gp;
       pm->b_run = FALSE;
-      penabled = g_strdup_printf(GAPC_ENABLE_KEY, pm->cb_monitor_num);
-      // XXX gconf_client_set_bool(pm->client, penabled, FALSE, NULL);
-      g_free(penabled);
+      g_settings_set_boolean(pm->monitor_settings, GAPC_ENABLE_KEY, FALSE);
    } else {
       /* this is a config struct (1) */
       pcfg = (PGAPC_CONFIG) gp;
       gtk_widget_destroy(GTK_WIDGET(pcfg->window));
    }
-
    return;
 }
 static void cb_util_popup_menu_response_jumpto(GtkWidget * widget, gpointer gp)
@@ -1525,10 +1515,10 @@ static gboolean cb_util_line_chart_refresh_control(PGAPC_MONITOR pm)
    GtkWidget *w = NULL;
    gchar *pch1 = NULL, *pch = NULL;
 
-   g_return_val_if_fail(pm != NULL, FALSE);
+   g_return_val_if_fail(pm != NULL, G_SOURCE_REMOVE);
 
    if ((!pm->b_run) || !(pm->cb_enabled))
-      return FALSE;                /* stop timers */
+      return G_SOURCE_REMOVE;      /* stop timers */
 
    pm->b_graph_control = FALSE;
    pm->phs.d_xinc = pm->d_graph * pm->d_refresh;
@@ -1542,7 +1532,7 @@ static gboolean cb_util_line_chart_refresh_control(PGAPC_MONITOR pm)
                  pm->phs.d_xinc);
    lg_graph_set_x_label_text (pm->phs.plg, pch);
 
-   g_free(pch);
+   g_clear_pointer(&pch, g_free);
 
    w = g_hash_table_lookup(pm->pht_Widgets, "StatusBar");
 
@@ -1551,11 +1541,9 @@ static gboolean cb_util_line_chart_refresh_control(PGAPC_MONITOR pm)
       pch1 = g_strdup_printf
          ("Graphing refresh cycle changed for host %s completed!...", pm->pch_host);
       gtk_statusbar_push(GTK_STATUSBAR(w), pm->i_info_context, pch1);
-      g_free(pch1);
-
+      g_clear_pointer(&pch1, g_free);
    }
-
-   return FALSE;
+   return G_SOURCE_REMOVE;
 }
 
 /*
@@ -1568,10 +1556,10 @@ static gboolean cb_monitor_refresh_control(PGAPC_MONITOR pm)
    GtkWidget *w = NULL;
    gchar *pch1 = NULL;
 
-   g_return_val_if_fail(pm != NULL, FALSE);
+   g_return_val_if_fail(pm != NULL, G_SOURCE_REMOVE);
 
    if ((!pm->b_run) || !(pm->cb_enabled))
-      return FALSE;                /* stop timers */
+      return G_SOURCE_REMOVE;      /* stop timers */
 
    pm->b_timer_control = FALSE;
 
@@ -1586,10 +1574,9 @@ static gboolean cb_monitor_refresh_control(PGAPC_MONITOR pm)
       pch1 = g_strdup_printf("Refresh Cycle Change for host %s Completed!...",
          pm->pch_host);
       gtk_statusbar_push(GTK_STATUSBAR(w), pm->i_info_context, pch1);
-      g_free(pch1);
+      g_clear_pointer(&pch1, g_free);
    }
-
-   return FALSE;
+   return G_SOURCE_REMOVE;
 }
 
 /*
@@ -1601,10 +1588,10 @@ static gboolean cb_monitor_dedicated_one_time_refresh(PGAPC_MONITOR pm)
    GtkWidget *w = NULL;
    gchar *pch1 = NULL;
 
-   g_return_val_if_fail(pm != NULL, FALSE);
+   g_return_val_if_fail(pm != NULL, G_SOURCE_REMOVE);
 
    if ((!pm->b_run) || !(pm->cb_enabled)) {
-      return FALSE;
+      return G_SOURCE_REMOVE;
    }
 
    if (!g_mutex_trylock(pm->gm_update)) {
@@ -1614,9 +1601,9 @@ static gboolean cb_monitor_dedicated_one_time_refresh(PGAPC_MONITOR pm)
          pch1 = g_strdup_printf("Quick refresh for %s failed!"
             " Network thread is busy...", pm->pch_host);
          gtk_statusbar_push(GTK_STATUSBAR(w), pm->i_info_context, pch1);
-         g_free(pch1);
+         g_clear_pointer(&pch1, g_free);
       }
-      return TRUE;                 /* thread must be busy */
+      return G_SOURCE_CONTINUE;    /* thread must be busy */
    }
 
    gdk_threads_enter();
@@ -1633,27 +1620,27 @@ static gboolean cb_monitor_dedicated_one_time_refresh(PGAPC_MONITOR pm)
          pch1 = g_strdup_printf("Refresh for %s failed! "
             "(retry enabled)... network busy!", pm->pch_host);
          gtk_statusbar_push(GTK_STATUSBAR(w), pm->i_info_context, pch1);
-         g_free(pch1);
+         g_clear_pointer(&pch1, g_free);
       }
       if (pm->i_netbusy_counter++ % 10) {       /* Fall thru and quit after ten trys */
          g_mutex_unlock(pm->gm_update);
          gdk_flush();
          gdk_threads_leave();
-         return TRUE;              /* try again */
+         return G_SOURCE_CONTINUE; /* try again */
       }
    }
 
    if (w != NULL) {
       pch1 = g_strdup_printf("One-Time Refresh for %s Completed...", pm->pch_host);
       gtk_statusbar_push(GTK_STATUSBAR(w), pm->i_info_context, pch1);
-      g_free(pch1);
+      g_clear_pointer(&pch1, g_free);
    }
 
    g_mutex_unlock(pm->gm_update);
    gdk_flush();
    gdk_threads_leave();
 
-   return FALSE;                   /* this will terminate the timer */
+   return G_SOURCE_REMOVE;         /* this will terminate the timer */
 }
 
 /*
@@ -1664,14 +1651,14 @@ static gboolean cb_monitor_automatic_refresh(PGAPC_MONITOR pm)
    gchar *pch1 = NULL;
    GtkWidget *w = NULL;
 
-   g_return_val_if_fail(pm != NULL, FALSE);
+   g_return_val_if_fail(pm != NULL, G_SOURCE_REMOVE);
 
    if ((!pm->b_run) || !(pm->cb_enabled))
-      return FALSE;                /* stop timers */
+      return G_SOURCE_REMOVE;      /* stop timers */
 
    if (pm->b_timer_control) {
       g_timeout_add(100, (GSourceFunc) cb_monitor_refresh_control, pm);
-      return FALSE;
+      return G_SOURCE_REMOVE;
    }
 
    if (!g_mutex_trylock(pm->gm_update)) {
@@ -1681,9 +1668,9 @@ static gboolean cb_monitor_automatic_refresh(PGAPC_MONITOR pm)
          pch1 = g_strdup_printf("Automatic refresh for %s failed!"
             " Network thread is busy...", pm->pch_host);
          gtk_statusbar_push(GTK_STATUSBAR(w), pm->i_info_context, pch1);
-         g_free(pch1);
+         g_clear_pointer(&pch1, g_free);
       }
-      return TRUE;                 /* thread must be busy */
+      return G_SOURCE_CONTINUE;    /* thread must be busy */
    }
 
    gdk_threads_enter();
@@ -1699,21 +1686,21 @@ static gboolean cb_monitor_automatic_refresh(PGAPC_MONITOR pm)
          pch1 =
             g_strdup_printf("Automatic refresh for %s complete...", pm->pch_host);
          gtk_statusbar_push(GTK_STATUSBAR(w), pm->i_info_context, pch1);
-         g_free(pch1);
+         g_clear_pointer(&pch1, g_free);
       }
    } else {
       if (w != NULL) {
          pch1 = g_strdup_printf("Automatic refresh for %s failed!"
             " Network thread is busy...", pm->pch_host);
          gtk_statusbar_push(GTK_STATUSBAR(w), pm->i_info_context, pch1);
-         g_free(pch1);
+         g_clear_pointer(&pch1, g_free);
       }
       if (pm->i_netbusy_counter++ % 10) {       /* fall thru every tenth time to queue a message */
          g_mutex_unlock(pm->gm_update);
          gdk_flush();
          gdk_threads_leave();
 
-         return TRUE;
+         return G_SOURCE_CONTINUE;
       }
    }
 
@@ -1725,7 +1712,7 @@ static gboolean cb_monitor_automatic_refresh(PGAPC_MONITOR pm)
    gdk_flush();
    gdk_threads_leave();
 
-   return TRUE;
+   return G_SOURCE_CONTINUE;
 }
 
 /*
@@ -1749,7 +1736,7 @@ static gboolean gapc_monitor_update_tooltip_msg(PGAPC_MONITOR pm)
 
    g_return_val_if_fail(pm != NULL, TRUE);
 
-   if (pm->b_run != TRUE)
+   if (!pm->b_run)
       return TRUE;
 
    w = g_hash_table_lookup(pm->pht_Widgets, "StatusBar");
@@ -1975,10 +1962,10 @@ static gboolean gapc_monitor_update_tooltip_msg(PGAPC_MONITOR pm)
       lg_graph_draw ( pm->phs.plg );
    }
 
-   g_free(pmsg);
-   g_free(ptitle);
+   g_clear_pointer(&pmsg, g_free);
+   g_clear_pointer(&ptitle, g_free);
 
-/*  g_free (pmview); */
+/*  g_clear_pointer (&pmview, g_free); */
 
    return b_flag;
 }
@@ -2002,10 +1989,10 @@ static gint gapc_monitor_update(PGAPC_MONITOR pm)
    if (pm->window == NULL)         /* not created yet */
       return TRUE;
 
-   if (pm->b_run == FALSE)
+   if (!pm->b_run)
       return FALSE;
 
-   if (pm->b_data_available == FALSE)
+   if (!pm->b_data_available)
       return FALSE;
 
    w = g_hash_table_lookup(pm->pht_Widgets, "StatusPage");
@@ -2217,7 +2204,7 @@ static gint sknet_net_write_nbytes (GIOChannel * ioc, gchar * ptr, gsize nbytes)
     nleft -= nwritten;
     ptr += nwritten;
   }
-  while ((nleft > 0) && (b_eof != TRUE));
+  while ((nleft > 0) && (!b_eof));
 
   return (nbytes - nleft);
 }
@@ -2300,7 +2287,7 @@ static gint sknet_net_read_nbytes (GIOChannel * ioc, gchar * ptr, gsize nbytes)
     nleft -= nread;
     ptr += nread;
   }
-  while ((nleft > 0) && (b_eof != TRUE));
+  while ((nleft > 0) && (!b_eof));
 
   return (nbytes - nleft);      /* return >= 0 */
 }
@@ -2551,11 +2538,8 @@ static void sknet_net_shutdown (PSKCOMM psk)
             }
     }
 
-    if (psk->gip != NULL) {
-        g_free(psk->gip);
-    }
-
-    g_free(psk);
+    g_clear_pointer(&psk->gip, g_free);
+    g_clear_pointer(&psk, g_free);
 
     return;
 }
@@ -2589,10 +2573,7 @@ static gint gapc_net_transaction_service(PGAPC_MONITOR pm, gchar * cp_cmd, gchar
 
    /* clear current data */
    for (iflag = 0; iflag < GAPC_MAX_ARRAY; iflag++) {
-      if (pch[iflag] != NULL) {
-         g_free(pch[iflag]);
-      }
-      pch[iflag] = NULL;
+      g_clear_pointer(&pch[iflag], g_free);
    }
 
    iflag = 0;
@@ -2738,10 +2719,10 @@ static gdouble gapc_util_point_filter_set(PGAPC_SUMS sq, gdouble this_point)
  * Returns: TRUE and iter is found, FALSE and invalid iter if not found
 */
 static gboolean gapc_util_treeview_get_iter_from_monitor(GtkTreeModel * model,
-   GtkTreeIter * iter, gint i_value)
+   GtkTreeIter * iter, guint i_value)
 {
    gboolean valid = FALSE, b_result = FALSE;
-   gint i_monitor;
+   guint i_monitor;
 
    g_return_val_if_fail(model != NULL, FALSE);
    g_return_val_if_fail(iter != NULL, FALSE);
@@ -2816,7 +2797,7 @@ static void gapc_util_log_app_msg(gchar * pch_func, gchar * pch_topic,
 
    g_message(pch);
 
-   g_free(pch);
+   g_clear_pointer(&pch, g_free);
 
    return;
 }
@@ -2851,7 +2832,7 @@ static gint gapc_util_update_hashtable(PGAPC_MONITOR pm, gchar * pch_unparsed)
 
    g_hash_table_replace(pm->pht_Status, g_strdup(pch_in), g_strdup(pch));
 
-   g_free(pch_in);
+   g_clear_pointer(&pch_in, g_free);
 
    return ilen;
 }
@@ -3023,7 +3004,7 @@ static gint gapc_panel_preferences_model_rec_remove(PGAPC_CONFIG pcfg)
 {
    GtkTreeIter iter, *piter = NULL;
    gboolean result = FALSE;
-   gint i_monitor = 0;
+   guint i_monitor = 0;
    gchar ch[GAPC_MAX_TEXT];
    gchar chk[GAPC_MAX_TEXT];
    GError *gerror = NULL;
@@ -3401,8 +3382,10 @@ static void cb_panel_prefs_handle_cell_toggled(GtkCellRendererToggle * cell,
    GtkTreeIter iter;
    GtkTreePath *path = NULL;
    gboolean b_value;
-   gint col_number = 0, i_monitor = 0;
-   gchar *penabled = NULL;
+   guint col_number = 0, i_monitor = 0;
+   guint16 h_monitor = 0;
+   gchar *monitor_settings_key = NULL;
+   GSettings *monitor_settings = NULL;
 
    g_return_if_fail(pcolumn != NULL);
    g_return_if_fail(path_str != NULL);
@@ -3424,14 +3407,18 @@ static void cb_panel_prefs_handle_cell_toggled(GtkCellRendererToggle * cell,
 
    switch (col_number) {
    case GAPC_PREFS_ENABLED:
-      penabled = g_strdup_printf(GAPC_ENABLE_KEY, i_monitor);
-      // XXX gconf_client_set_bool(pcolumn->client, penabled, b_value, NULL);
-      g_free(penabled);
+      h_monitor = (guint16)i_monitor;
+      monitor_settings_key = g_strdup_printf(GAPC_MONITOR_NAME_OUTPUT_FORMAT, h_monitor);
+      monitor_settings = g_hash_table_lookup(pcolumn->pht_Monitor_Settings, monitor_settings_key);
+      g_settings_set_boolean(monitor_settings, GAPC_ENABLE_KEY, b_value);
+      g_clear_pointer(&monitor_settings_key, g_free);
       break;
    case GAPC_PREFS_SYSTRAY:
-      penabled = g_strdup_printf(GAPC_SYSTRAY_KEY, i_monitor);
-      // XXX gconf_client_set_bool(pcolumn->client, penabled, b_value, NULL);
-      g_free(penabled);
+      h_monitor = (guint16)i_monitor;
+      monitor_settings_key = g_strdup_printf(GAPC_MONITOR_NAME_OUTPUT_FORMAT, h_monitor);
+      monitor_settings = g_hash_table_lookup(pcolumn->pht_Monitor_Settings, monitor_settings_key);
+      g_settings_set_boolean(monitor_settings, GAPC_SYSTRAY_KEY, b_value);
+      g_clear_pointer(&monitor_settings_key, g_free);
       break;
    default:
       g_message("Cell_Toggled:Unknown key for Value(%s)\n",
@@ -3451,8 +3438,8 @@ static void cb_panel_prefs_handle_cell_toggled(GtkCellRendererToggle * cell,
  * - Graph refresh
  * - Network refresh
  * - Monitor - not a visible field
- *  We update gconf here and gconf updates the // FIXME COMMENT
- *  list_store in cb_panel_preference_gconf_changed() // FIXME
+ *  We update GSettings here and GSettings updates the
+ *  list_store in cb_panel_preference_gsettings_changed()
 */
 static void cb_panel_prefs_handle_cell_edited(GtkCellRendererText * cell,
    gchar * path_string, gchar * pch_new, PGAPC_PREFS_COLUMN pcolumn)
@@ -3460,8 +3447,9 @@ static void cb_panel_prefs_handle_cell_edited(GtkCellRendererText * cell,
    GtkTreeModel *model;
    GtkTreeIter iter;
    GtkTreePath *path;
-   gint col_number = 0, i_port = 0, i_monitor = 0, i_len = 0;
-   gfloat f_refresh = 0.0, f_graph = 0.0;
+   gint col_number = 0, i_port = 0, i_len = 0;
+   guint i_monitor = 0;
+   gdouble f_refresh = 0.0, f_graph = 0.0;
    gchar ch[GAPC_MAX_TEXT], *pch = NULL;
    gboolean b_dupped = FALSE;
 
@@ -3488,7 +3476,7 @@ static void cb_panel_prefs_handle_cell_edited(GtkCellRendererText * cell,
    switch (col_number) {
    case GAPC_PREFS_HOST:
       {
-         gchar *phost = g_strdup_printf(GAPC_HOST_KEY, i_monitor);
+         gchar *phost = g_strdup_printf(GAPC_HOST_KEY, i_monitor);// XXX FIXME
 
          if ((pch_new == NULL) || (i_len < 2)) {
             pch = g_strdup(GAPC_HOST_DEFAULT);
@@ -3497,12 +3485,12 @@ static void cb_panel_prefs_handle_cell_edited(GtkCellRendererText * cell,
             b_dupped = TRUE;
          }
          // XXX gconf_client_set_string(pcolumn->client, phost, pch, NULL);
-         g_free(phost);
+         g_clear_pointer(&phost, g_free);
       }
       break;
    case GAPC_PREFS_PORT:
       {
-         gchar *pport = g_strdup_printf(GAPC_PORT_KEY, i_monitor);
+         gchar *pport = g_strdup_printf(GAPC_PORT_KEY, i_monitor);// XXX FIXME
 
          i_port = (gint) g_strtod(pch_new, NULL);
 
@@ -3514,12 +3502,12 @@ static void cb_panel_prefs_handle_cell_edited(GtkCellRendererText * cell,
             b_dupped = TRUE;
          }
          // XXX gconf_client_set_int(pcolumn->client, pport, i_port, NULL);
-         g_free(pport);
+         g_clear_pointer(&pport, g_free);
       }
       break;
    case GAPC_PREFS_WATT:
       {
-         gchar *pport = g_strdup_printf(GAPC_WATT_KEY, i_monitor);
+         gchar *pport = g_strdup_printf(GAPC_WATT_KEY, i_monitor);// XXX FIXME
 
          i_port = (gint) g_strtod(pch_new, NULL);
 
@@ -3531,14 +3519,14 @@ static void cb_panel_prefs_handle_cell_edited(GtkCellRendererText * cell,
             b_dupped = TRUE;
          }
          // XXX gconf_client_set_int(pcolumn->client, pport, i_port, NULL);
-         g_free(pport);
+         g_clear_pointer(&pport, g_free);
       }
       break;
    case GAPC_PREFS_REFRESH:
       {
-         gchar *prefresh = g_strdup_printf(GAPC_REFRESH_KEY, i_monitor);
+         gchar *prefresh = g_strdup_printf(GAPC_REFRESH_KEY, i_monitor);// XXX FIXME
 
-         f_refresh = (gfloat) g_strtod(pch_new, NULL);
+         f_refresh = g_strtod(pch_new, NULL);
 
          if (f_refresh < GAPC_REFRESH_MIN_INCREMENT) {
             f_refresh = GAPC_REFRESH_DEFAULT;
@@ -3548,14 +3536,14 @@ static void cb_panel_prefs_handle_cell_edited(GtkCellRendererText * cell,
             b_dupped = TRUE;
          }
          // XXX gconf_client_set_float(pcolumn->client, prefresh, f_refresh, NULL);
-         g_free(prefresh);
+         g_clear_pointer(&prefresh, g_free);
       }
       break;
    case GAPC_PREFS_GRAPH:
       {
-         gchar *prefresh = g_strdup_printf(GAPC_GRAPH_KEY, i_monitor);
+         gchar *prefresh = g_strdup_printf(GAPC_GRAPH_KEY, i_monitor);// XXX FIXME
 
-         f_graph = (gfloat) g_strtod(pch_new, NULL);
+         f_graph = g_strtod(pch_new, NULL);
 
          if (f_graph < GAPC_REFRESH_MIN_INCREMENT) {
             f_graph = GAPC_LINEGRAPH_REFRESH_FACTOR;
@@ -3565,7 +3553,7 @@ static void cb_panel_prefs_handle_cell_edited(GtkCellRendererText * cell,
             b_dupped = TRUE;
          }
          // XXX gconf_client_set_float(pcolumn->client, prefresh, f_graph, NULL);
-         g_free(prefresh);
+         g_clear_pointer(&prefresh, g_free);
       }
       break;
    default:
@@ -3574,10 +3562,9 @@ static void cb_panel_prefs_handle_cell_edited(GtkCellRendererText * cell,
       break;
    }
 
-   if ((pch != NULL) && !b_dupped) {
-      g_free(pch);
+   if (!b_dupped) {
+      g_clear_pointer(&pch, g_free);
    }
-
    return;
 }
 
@@ -3588,7 +3575,7 @@ static void cb_panel_prefs_handle_cell_edited(GtkCellRendererText * cell,
 static void cb_panel_prefs_handle_float_format(GtkTreeViewColumn * col,
    GtkCellRenderer * renderer, GtkTreeModel * model, GtkTreeIter * iter, gpointer gp)
 {
-   gfloat d_value;
+   gdouble d_value;
    gchar buf[32];
    guint colnum = 0;
    gchar *pch_format = NULL;
@@ -3626,122 +3613,88 @@ static PGAPC_PREFS_COLUMN gapc_panel_prefs_col_data_init(PGAPC_CONFIG pcfg,
    pcol->cb_id = CB_COLUMN_ID;
    pcol->prefs_model = pcfg->prefs_model;
    pcol->i_col_num = col_num;
-   // XXX pcol->client = pcfg->client;
+   pcol->pht_Monitor_Settings = pcfg->pht_Monitor_Settings;
 
    return pcol;
 }
 
 /*
- * Gets the gconf instance preferences for all monitors // FIXME COMMENT
+ * Gets the GSettings preferences for all monitors
  * and loads the prefs_model.
  * returns FALSE on error
  * returns TRUE on success
 */
 static gboolean gapc_panel_preferences_data_model_load(PGAPC_CONFIG pcfg)
 {
-   GError *gerror = NULL;
-   GSList *monitors = NULL;
    GtkTreeIter iter;
-   gboolean b_valid = FALSE;
    gboolean v_enabled;
    gboolean v_use_systray;
-   gint v_port_number;
-   gint v_watt_number;
-   gfloat v_network_interval;
-   gfloat v_graph_interval;
+   guint16 vh_port_number;
+   guint v_port_number;
+   guint16 vh_watt_number;
+   guint v_watt_number;
+   gdouble v_network_interval;
+   gdouble v_graph_interval;
    gchar *v_host_name;
-
-   gchar k_enabled[GAPC_MAX_TEXT];
-   gchar k_use_systray[GAPC_MAX_TEXT];
-   gchar k_port_number[GAPC_MAX_TEXT];
-   gchar k_network_interval[GAPC_MAX_TEXT];
-   gchar k_graph_interval[GAPC_MAX_TEXT];
-   gchar k_host_name[GAPC_MAX_TEXT];
-   gchar k_watt_number[GAPC_MAX_TEXT];
+   gchar ** monitor_names;
+   guint monitor_names_count;
+   gchar *monitor_settings_path;
+   guint16 h_monitor;
+   guint i_monitor;
 
    g_return_val_if_fail(pcfg != NULL, FALSE);
-   // XXX g_return_val_if_fail(pcfg->client != NULL, FALSE);
+   g_return_val_if_fail(pcfg->app_settings != NULL, FALSE);
+   g_return_val_if_fail(pcfg->prefs_model != NULL, FALSE);
    g_return_val_if_fail(pcfg->prefs_model != NULL, FALSE);
 
-   // XXX b_valid = gconf_client_dir_exists(pcfg->client, GAPC_MID_GROUP_KEY, &gerror);
-   if (gerror != NULL) {
-      gapc_util_log_app_msg("gapc_panel_preferences_data_model_load",
-         "gconf_dir_exists() Failed", gerror->message); // FIXME MESSAGE
-      g_error_free(gerror);
-      gerror = NULL;
-      return FALSE;
-   }
+   monitor_names = g_settings_get_strv(pcfg->app_settings, GAPC_MONITOR_NAMES_KEY);
+   monitor_names_count = g_strv_length(monitor_names);
 
-
-   if (b_valid == FALSE) {
+   if (monitor_names_count == 0) {
       gapc_util_log_app_msg("gapc_panel_preferences_data_model_load",
          "No monitors predefined.", "very first startup");
+      g_clear_pointer(&monitor_names, g_strfreev);
       return FALSE;
    }
-
-   // XXX monitors = gconf_client_all_dirs(pcfg->client, GAPC_MID_GROUP_KEY, &gerror);
-   if (gerror != NULL) {
-      gapc_util_log_app_msg("gapc_panel_preferences_data_model_load",
-         "gconf_client_all_dirs() Failed", gerror->message); // FIXME MESSAGE
-      g_error_free(gerror);
-      gerror = NULL;
-      return FALSE;
-   }
-
-   while (monitors) {              /* should be the regular text key */
-      gchar *pmon = NULL;
-      gint i_monitor = 0;
+   for (guint i = 0; i != monitor_names_count; i++) {
       GtkWidget *widget = NULL;
-
-      pmon = g_strrstr((gchar *) monitors->data, "/");
-      if (pmon) {
-         i_monitor = (gint) g_strtod(pmon + 1, NULL);
-         pcfg->prefs_last_monitor = MAX(pcfg->prefs_last_monitor, i_monitor);
-      } else {
-         g_free(monitors->data);
-         monitors = g_slist_next(monitors);
+      const gchar* monitor_name = monitor_names[i];
+      sscanf(monitor_name, GAPC_MONITOR_NAME_INPUT_FORMAT, &h_monitor);
+      if (h_monitor == 0) {
          continue;
       }
+      i_monitor = (guint)h_monitor;
+      pcfg->prefs_last_monitor = MAX(pcfg->prefs_last_monitor, i_monitor);
 
-      g_snprintf(k_enabled, GAPC_MAX_TEXT, "%s/%s", (gchar *) monitors->data,
-         "enabled");
-      g_snprintf(k_use_systray, GAPC_MAX_TEXT, "%s/%s", (gchar *) monitors->data,
-         "use_systray");
-      g_snprintf(k_port_number, GAPC_MAX_TEXT, "%s/%s", (gchar *) monitors->data,
-         "port_number");
-      g_snprintf(k_watt_number, GAPC_MAX_TEXT, "%s/%s", (gchar *) monitors->data,
-         "ups_wattage");
-      g_snprintf(k_network_interval, GAPC_MAX_TEXT, "%s/%s",
-         (gchar *) monitors->data, "network_interval");
-      g_snprintf(k_graph_interval, GAPC_MAX_TEXT, "%s/%s", (gchar *) monitors->data,
-         "graph_interval");
-      g_snprintf(k_host_name, GAPC_MAX_TEXT, "%s/%s", (gchar *) monitors->data,
-         "host_name");
-
-      // XXX v_enabled = gconf_client_get_bool(pcfg->client, k_enabled, NULL);
-      // XXX v_use_systray = gconf_client_get_bool(pcfg->client, k_use_systray, NULL);
-      // XXX v_port_number = gconf_client_get_int(pcfg->client, k_port_number, NULL);
+      monitor_settings_path = g_strdup_printf(
+         GAPC_MONITOR_PATH_OUTPUT_FORMAT,
+         h_monitor);
+      GSettings *monitor_settings = g_settings_new_with_path(GAPC_MONITOR_SCHEMA_ID, monitor_settings_path);
+      g_clear_pointer(&monitor_settings_path, g_free);
+      g_hash_table_insert(pcfg->pht_Monitor_Settings, g_strdup(monitor_name), monitor_settings);
+      v_enabled = g_settings_get_boolean(monitor_settings, GAPC_ENABLE_KEY);
+      v_use_systray = g_settings_get_boolean(monitor_settings, GAPC_SYSTRAY_KEY);
+      g_settings_get(monitor_settings, GAPC_PORT_KEY, "q", &vh_port_number);
+      v_port_number = (guint)vh_port_number;
       if (v_port_number == 0) {
          v_port_number = GAPC_PORT_DEFAULT;
       }
-      // XXX v_watt_number = gconf_client_get_int(pcfg->client, k_watt_number, NULL);
+      g_settings_get(monitor_settings, GAPC_WATT_KEY, "q", &vh_watt_number);
+      v_watt_number = (guint)vh_watt_number;
       if (v_watt_number == 0) {
          v_watt_number = GAPC_WATT_DEFAULT;
       }
-      // XXX v_network_interval =
-      // XXX    gconf_client_get_float(pcfg->client, k_network_interval, NULL);
+      v_network_interval =
+         g_settings_get_double(monitor_settings, GAPC_REFRESH_KEY);
       if (v_network_interval == 0.0) {
          v_network_interval = GAPC_REFRESH_DEFAULT;
       }
-      // XXX v_graph_interval =
-      // XXX    gconf_client_get_float(pcfg->client, k_graph_interval, NULL);
+      v_graph_interval =
+         g_settings_get_double(monitor_settings, GAPC_GRAPH_KEY);
       if (v_graph_interval == 0.0) {
          v_graph_interval = GAPC_LINEGRAPH_REFRESH_FACTOR;
       }
-      // XXX v_host_name = gconf_client_get_string(pcfg->client, k_host_name, NULL);
-      if (v_host_name == NULL) {
-         v_host_name = g_strdup(GAPC_HOST_DEFAULT);
-      }
+      v_host_name = g_settings_get_string(monitor_settings, GAPC_HOST_KEY);
 
       gtk_list_store_append(GTK_LIST_STORE(pcfg->prefs_model), &iter);
       gtk_list_store_set(GTK_LIST_STORE(pcfg->prefs_model), &iter,
@@ -3755,6 +3708,8 @@ static gboolean gapc_panel_preferences_data_model_load(PGAPC_CONFIG pcfg)
          GAPC_PREFS_WATT, v_watt_number,
          -1);
 
+      g_clear_pointer(&v_host_name, g_free);
+
       /* Startup Processing */
       if (v_enabled) {
          widget = gapc_monitor_interface_create(pcfg, i_monitor, &iter);
@@ -3762,11 +3717,8 @@ static gboolean gapc_panel_preferences_data_model_load(PGAPC_CONFIG pcfg)
               gtk_window_present( GTK_WINDOW(widget));
          }
       }
-      g_free(monitors->data);
-      monitors = g_slist_next(monitors);
    }
-   g_slist_free(monitors);
-
+   g_clear_pointer(&monitor_names, g_strfreev);
    return TRUE;
 }
 
@@ -3795,14 +3747,14 @@ static GtkWidget *gapc_panel_preferences_model_init(PGAPC_CONFIG pcfg)
 
    /* Create the model -- this column order and that of the enum must match */
    model = GTK_TREE_MODEL(gtk_list_store_new(GAPC_N_PREFS_COLUMNS,
-         G_TYPE_INT,  /* Monitor base-1 */
+         G_TYPE_UINT,              /* Monitor base-1 */
          G_TYPE_BOOLEAN,           /* enabled */
          G_TYPE_BOOLEAN,           /* systray icon */
-         G_TYPE_INT,               /* Port  */
-         G_TYPE_FLOAT,             /* network Refresh */
-         G_TYPE_FLOAT,             /* graph Refresh */
+         G_TYPE_UINT,              /* Port  */
+         G_TYPE_DOUBLE,            /* network Refresh */
+         G_TYPE_DOUBLE,            /* graph Refresh */
          G_TYPE_STRING,            /* Host  */
-         G_TYPE_INT                /* Wattage  */
+         G_TYPE_UINT               /* Wattage  */
       ));
    /* store it for later */
    pcfg->prefs_model = model;
@@ -3847,27 +3799,27 @@ static GtkWidget *gapc_panel_preferences_model_init(PGAPC_CONFIG pcfg)
     * careful to use these only once per column --
     * using an auto g_free to release allocated storage
     */
-   gtk_signal_connect_full(GTK_OBJECT(renderer_enabled), "toggled",
-      G_CALLBACK(cb_panel_prefs_handle_cell_toggled), NULL,
-      col_enabled, g_free, FALSE, TRUE);
-   gtk_signal_connect_full(GTK_OBJECT(renderer_systray), "toggled",
-      G_CALLBACK(cb_panel_prefs_handle_cell_toggled), NULL,
-      col_systray, g_free, FALSE, TRUE);
-   gtk_signal_connect_full(GTK_OBJECT(renderer_port), "edited",
-      G_CALLBACK(cb_panel_prefs_handle_cell_edited), NULL,
-      col_port, g_free, FALSE, TRUE);
-   gtk_signal_connect_full(GTK_OBJECT(renderer_watt), "edited",
-      G_CALLBACK(cb_panel_prefs_handle_cell_edited), NULL,
-      col_watt, g_free, FALSE, TRUE);
-   gtk_signal_connect_full(GTK_OBJECT(renderer_refresh), "edited",
-      G_CALLBACK(cb_panel_prefs_handle_cell_edited), NULL,
-      col_refresh, g_free, FALSE, TRUE);
-   gtk_signal_connect_full(GTK_OBJECT(renderer_graph), "edited",
-      G_CALLBACK(cb_panel_prefs_handle_cell_edited), NULL,
-      col_graph, g_free, FALSE, TRUE);
-   gtk_signal_connect_full(GTK_OBJECT(renderer_host), "edited",
-      G_CALLBACK(cb_panel_prefs_handle_cell_edited), NULL,
-      col_host, g_free, FALSE, TRUE);
+   g_signal_connect_data(renderer_enabled, "toggled",
+      G_CALLBACK(cb_panel_prefs_handle_cell_toggled),
+      col_enabled, (GClosureNotify)g_free, G_CONNECT_AFTER);
+   g_signal_connect_data(renderer_systray, "toggled",
+      G_CALLBACK(cb_panel_prefs_handle_cell_toggled),
+      col_systray, (GClosureNotify)g_free, G_CONNECT_AFTER);
+   g_signal_connect_data(renderer_port, "edited",
+      G_CALLBACK(cb_panel_prefs_handle_cell_edited),
+      col_port, (GClosureNotify)g_free, G_CONNECT_AFTER);
+   g_signal_connect_data(renderer_watt, "edited",
+      G_CALLBACK(cb_panel_prefs_handle_cell_edited),
+      col_watt, (GClosureNotify)g_free, G_CONNECT_AFTER);
+   g_signal_connect_data(renderer_refresh, "edited",
+      G_CALLBACK(cb_panel_prefs_handle_cell_edited),
+      col_refresh, (GClosureNotify)g_free, G_CONNECT_AFTER);
+   g_signal_connect_data(renderer_graph, "edited",
+      G_CALLBACK(cb_panel_prefs_handle_cell_edited),
+      col_graph, (GClosureNotify)g_free, G_CONNECT_AFTER);
+   g_signal_connect_data(renderer_host, "edited",
+      G_CALLBACK(cb_panel_prefs_handle_cell_edited),
+      col_host, (GClosureNotify)g_free, G_CONNECT_AFTER);
 
    /* Define the column order and attributes */
    column = gtk_tree_view_column_new_with_attributes("Enabled", renderer_enabled,
@@ -3936,7 +3888,7 @@ static GtkWidget *gapc_panel_monitors_model_init(PGAPC_CONFIG pcfg)
       return GTK_WIDGET(pcfg->monitor_treeview);
 
    /* Create the model -- this column order and that of the enum must match */
-   model = GTK_TREE_MODEL(gtk_list_store_new(GAPC_N_MON_COLUMNS, G_TYPE_INT,    /* Monitor Num */
+   model = GTK_TREE_MODEL(gtk_list_store_new(GAPC_N_MON_COLUMNS, G_TYPE_UINT,   /* Monitor Num */
          GDK_TYPE_PIXBUF,          /* ICON */
          G_TYPE_STRING,            /* Status Text */
          G_TYPE_POINTER,           /* monitor ptr */
@@ -4053,7 +4005,7 @@ static gboolean gapc_util_load_icons(PGAPC_CONFIG pcfg)
     if (i_x == 0) {
        gapc_util_log_app_msg("gapc_util_load_icons", "Unable to find icons",
           "--load failed!");
-      g_free (pch_4);
+      g_clear_pointer (&pch_4, g_free);
       return FALSE;
     }
 
@@ -4083,7 +4035,7 @@ static gboolean gapc_util_load_icons(PGAPC_CONFIG pcfg)
           pch = g_strdup_printf("Get Icon=%s Failed", pch_file);
           gapc_util_log_app_msg("gapc_util_load_icons", pch, gerror->message);
           g_error_free(gerror);
-          g_free(pch);
+          g_clear_pointer(&pch, g_free);
           gerror = NULL;
           b_rc = FALSE;
           pcfg->my_icons[x] = NULL;
@@ -4094,8 +4046,8 @@ static gboolean gapc_util_load_icons(PGAPC_CONFIG pcfg)
           g_object_unref(pixbuf);
        }
     }
+    g_clear_pointer (&pch_4, g_free);
 
-    g_free (pch_4);
     return b_rc;
 }
 
@@ -4121,7 +4073,6 @@ static void cb_panel_monitor_list_activated(GtkTreeView * treeview,
          }
       }
    }
-
    return;
 }
 
@@ -4133,7 +4084,7 @@ static void cb_panel_monitor_list_selection(GtkTreeSelection * selection,
 {
    GtkTreeIter iter;
    GtkTreeModel *model;
-   gint i_monitor = 0;
+   guint i_monitor = 0;
 
    g_return_if_fail(pcfg != NULL);
 
@@ -4142,7 +4093,6 @@ static void cb_panel_monitor_list_selection(GtkTreeSelection * selection,
 
       pcfg->cb_last_monitor = i_monitor;
    }
-
    return;
 }
 
@@ -4395,8 +4345,8 @@ static gint gapc_panel_about_page(GtkNotebook * notebook, gchar * pch_pname,
    gtk_box_pack_start(GTK_BOX(vbox), label, TRUE, TRUE, 0);
    gtk_widget_show(label);
 
-   g_free(about_text);
-   g_free(about_msg);
+   g_clear_pointer(&about_text, g_free);
+   g_clear_pointer(&about_msg, g_free);
 
    return i_page;
 }
@@ -4561,119 +4511,67 @@ static void controller_use_systray_changed(
       }
    }
 }
-
+// XXX TODO NEED ROUTINE TO HANDLE CHANGES TO APP SETTINGS
 /*
- * GConf2 routine // FIXME COMMENT
+ * GSettings routine
  * Handles changes to prefs_model, or the master list of monitors in the preferences page.
  * Triggers for this routine should not be installed until after the
  * control panel has been created.
 */
-static void cb_panel_preferences_gconf_changed(/* XXX GConfClient * client, guint cnxn_id, */ // FIXME
-   /* XXX GConfEntry * entry, */ PGAPC_CONFIG pcfg)
+static void cb_panel_preferences_gsettings_changed(
+   GSettings *monitor_settings,
+   gchar *key,
+   PGAPC_CONFIG pcfg)
 {
    gchar *pch_value = NULL;
-   gchar *pkey = NULL, **pkey_l = NULL;
+   gchar *monitor_settings_path = NULL;
 
    gboolean ov_b_tray = FALSE;
-   gint ov_i_port = 0;
-   gint ov_i_watt = 0;
-   gfloat ov_f_graph = 0.0;
-   gfloat ov_f_refresh = 0.0;
+   guint ov_i_port = 0;
+   guint ov_i_watt = 0;
+   gdouble ov_f_graph = 0.0;
+   gdouble ov_f_refresh = 0.0;
    gchar *ov_s_host = NULL;
 
 
-   gint i_monitor = 0;
-   gint i_value = 0, i_len = 0;
-   gfloat f_value = 0.0;
+   guint i_monitor = 0;
+   guint i_value = 0;
+   guint16 h_value = 0;
+   gint i_len = 0;
+   gdouble d_value = 0.0;
    gchar *s_value = NULL, ch[GAPC_MAX_TEXT];
-   gboolean b_value = FALSE, b_flag_dupped = FALSE;
+   gboolean b_value = FALSE;
 
    gboolean b_ls_valid = FALSE;
-   gboolean b_v_valid = FALSE;
-   gboolean b_k_valid = FALSE;
-   gboolean b_k_is_dir = FALSE;
-   gboolean b_m_valid = FALSE;
-   gboolean b_m_enabled = FALSE, b_add = TRUE, b_active_valid = FALSE;
+   gboolean b_m_enabled = FALSE, b_active_valid = FALSE;
    GtkTreeIter iter;
    GtkTreeIter miter;
    PGAPC_MONITOR pm = NULL;
 
    g_return_if_fail(pcfg != NULL);
-   // XXX g_return_if_fail(entry != NULL);
+   g_return_if_fail(key != NULL);
    g_return_if_fail(pcfg->window != NULL);
 
-   /* Parse out monitor number and item.key */
-   // XXX pkey_l = g_strsplit(entry->key, "/", -1);
-   if (pkey_l[5] != NULL) {
-      pkey = g_strdup(pkey_l[5]);
-      b_k_valid = TRUE;
-   } else {
-      b_k_is_dir = TRUE;
-   }
-   if (pkey_l[4] != NULL) {
-      i_monitor = (gint) g_strtod(pkey_l[4], NULL);
-      b_m_valid = TRUE;
-   }
-   g_strfreev(pkey_l);
+   /* Parse out monitor number */
 
-   gdk_threads_enter();
+   g_object_get(
+      monitor_settings,
+      "path",
+      &monitor_settings_path,
+      NULL);
+
+   sscanf(monitor_settings_path, GAPC_MONITOR_PATH_INPUT_FORMAT, &i_monitor);
+   if (i_monitor == 0) {
+      return;
+   }
+   g_clear_pointer(&monitor_settings_path, g_free);
 
    /* Determine control bools */
    b_ls_valid =
       gapc_util_treeview_get_iter_from_monitor(pcfg->prefs_model, &iter, i_monitor);
-   if (b_ls_valid) {
-      gtk_tree_model_get(pcfg->prefs_model, &iter,
-         GAPC_PREFS_ENABLED, &b_m_enabled,
-         GAPC_PREFS_SYSTRAY, &ov_b_tray,
-         GAPC_PREFS_PORT, &ov_i_port,
-         GAPC_PREFS_WATT, &ov_i_watt,
-         GAPC_PREFS_GRAPH, &ov_f_graph,
-         GAPC_PREFS_REFRESH, &ov_f_refresh,
-         GAPC_PREFS_HOST, &ov_s_host, -1);
-   }
-   // XXX if (entry->value != NULL) {
-      // XXX pch_value = (gchar *) gconf_value_to_string(entry->value);
-      if (pch_value != NULL) {
-         b_v_valid = TRUE;
-      }
-   // XXX }
-
-   /* perform record.level operations */
-   if (b_ls_valid && !b_k_valid && !b_v_valid) {        /* delete null dir - no key val */
-      if (b_m_enabled) {
-         gapc_monitor_interface_destroy(pcfg, i_monitor);
-         b_m_enabled = FALSE;
-      }
-      gtk_list_store_remove(GTK_LIST_STORE(pcfg->prefs_model), &iter);
-      b_ls_valid = FALSE;
-      pcfg->cb_last_monitor_deleted = i_monitor;
-   }
-   if (i_monitor == pcfg->cb_last_monitor_deleted) {    /* override gconf_unset-kde issue */ // FIXME COMMENT
-      b_k_valid = FALSE;
-      b_v_valid = FALSE;
-      b_m_enabled = FALSE;
-   }
-   if (!b_ls_valid && b_v_valid && b_k_valid) { /* add new rec if keys valid -nfound */
-      gtk_list_store_append(GTK_LIST_STORE(pcfg->prefs_model), &iter);
-      gtk_list_store_set(GTK_LIST_STORE(pcfg->prefs_model), &iter,
-         GAPC_PREFS_MONITOR, i_monitor,
-         GAPC_PREFS_SYSTRAY, FALSE,
-         GAPC_PREFS_ENABLED, FALSE,
-         GAPC_PREFS_PORT, GAPC_PORT_DEFAULT,
-         GAPC_PREFS_GRAPH, GAPC_LINEGRAPH_REFRESH_FACTOR,
-         GAPC_PREFS_HOST, GAPC_HOST_DEFAULT,
-         GAPC_PREFS_REFRESH, GAPC_REFRESH_DEFAULT,
-         GAPC_PREFS_WATT, GAPC_WATT_DEFAULT,
-         -1);
-
-      b_ls_valid = TRUE;
-      b_add = TRUE;
-      b_m_enabled = FALSE;
-   }
 
    /* perform cell.level operations */
-   if (b_ls_valid && b_v_valid && b_k_valid) {
-
+   if (b_ls_valid) {
       b_active_valid =
          gapc_util_treeview_get_iter_from_monitor(pcfg->monitor_model, &miter,
          i_monitor);
@@ -4686,9 +4584,12 @@ static void cb_panel_preferences_gconf_changed(/* XXX GConfClient * client, guin
       if ((pm == NULL) || (pm->window == NULL)) {
          b_active_valid = FALSE;
       }
-
-      if (g_str_equal(pkey, "enabled")) {
-         // XXX b_value = gconf_value_get_bool(entry->value);
+      if (g_str_equal(key, GAPC_ENABLE_KEY)) {
+         gtk_tree_model_get(
+            pcfg->prefs_model,
+            &iter,
+            GAPC_PREFS_ENABLED, &b_m_enabled, -1);
+         b_value = g_settings_get_boolean(monitor_settings, key);
          if (b_value != b_m_enabled) {
             gtk_list_store_set(GTK_LIST_STORE(pcfg->prefs_model), &iter,
                GAPC_PREFS_ENABLED, b_value, -1);
@@ -4701,8 +4602,13 @@ static void cb_panel_preferences_gconf_changed(/* XXX GConfClient * client, guin
             gapc_monitor_interface_destroy(pcfg, i_monitor);
          }
       }
-      if (g_str_equal(pkey, "use_systray")) {
-         // XXX b_value = gconf_value_get_bool(entry->value);
+      else if (g_str_equal(key, GAPC_SYSTRAY_KEY)) {
+         gtk_tree_model_get(
+            pcfg->prefs_model,
+            &iter,
+            GAPC_PREFS_ENABLED, &b_m_enabled,
+            GAPC_PREFS_SYSTRAY, &ov_b_tray, -1);
+         b_value = g_settings_get_boolean(monitor_settings, key);
          if (b_value != ov_b_tray) {
             gtk_list_store_set(GTK_LIST_STORE(pcfg->prefs_model), &iter,
                GAPC_PREFS_SYSTRAY, b_value, -1);
@@ -4716,8 +4622,14 @@ static void cb_panel_preferences_gconf_changed(/* XXX GConfClient * client, guin
             }
          }
       }
-      if (g_str_equal(pkey, "port_number")) {
-         // XXX i_value = gconf_value_get_int(entry->value);
+      else if (g_str_equal(key, GAPC_PORT_KEY)) {
+         gtk_tree_model_get(
+            pcfg->prefs_model,
+            &iter,
+            GAPC_PREFS_ENABLED, &b_m_enabled,
+            GAPC_PREFS_PORT, &ov_i_port, -1);
+         g_settings_get(monitor_settings, key, "q", &h_value);
+         i_value = (guint)h_value;
          if (i_value != ov_i_port) {
             gtk_list_store_set(GTK_LIST_STORE(pcfg->prefs_model), &iter,
                GAPC_PREFS_PORT, i_value, -1);
@@ -4731,8 +4643,14 @@ static void cb_panel_preferences_gconf_changed(/* XXX GConfClient * client, guin
             }
          }
       }
-      if (g_str_equal(pkey, "ups_wattage")) {
-         // XXX i_value = gconf_value_get_int(entry->value);
+      else if (g_str_equal(key, GAPC_WATT_KEY)) {
+         gtk_tree_model_get(
+            pcfg->prefs_model,
+            &iter,
+            GAPC_PREFS_ENABLED, &b_m_enabled,
+            GAPC_PREFS_WATT, &ov_i_watt, -1);
+         g_settings_get(monitor_settings, key, "q", &h_value);
+         i_value = (guint)h_value;
          if (i_value != ov_i_watt) {
             gtk_list_store_set(GTK_LIST_STORE(pcfg->prefs_model), &iter,
                GAPC_PREFS_WATT, i_value, -1);
@@ -4741,43 +4659,55 @@ static void cb_panel_preferences_gconf_changed(/* XXX GConfClient * client, guin
               pm->i_watt = i_value;
          }
       }
-      if (g_str_equal(pkey, "network_interval")) {
-         // XXX f_value = gconf_value_get_float(entry->value);
-         if (f_value != ov_f_refresh) {
+      else if (g_str_equal(key, GAPC_REFRESH_KEY)) {
+         gtk_tree_model_get(
+            pcfg->prefs_model,
+            &iter,
+            GAPC_PREFS_ENABLED, &b_m_enabled,
+            GAPC_PREFS_REFRESH, &ov_f_refresh, -1);
+         d_value = g_settings_get_double(monitor_settings, key);
+         if (d_value != ov_f_refresh) {
             gtk_list_store_set(GTK_LIST_STORE(pcfg->prefs_model), &iter,
-               GAPC_PREFS_REFRESH, f_value, -1);
+               GAPC_PREFS_REFRESH, d_value, -1);
          }
          if ((b_m_enabled) && (b_active_valid)) {
-            pm->d_refresh = f_value;
+            pm->d_refresh = d_value;
             pm->b_timer_control = TRUE;
          }
       }
-      if (g_str_equal(pkey, "graph_interval")) {
-         // XXX f_value = gconf_value_get_float(entry->value);
-         if (f_value != ov_f_graph) {
+      else if (g_str_equal(key, GAPC_GRAPH_KEY)) {
+         gtk_tree_model_get(
+            pcfg->prefs_model,
+            &iter,
+            GAPC_PREFS_ENABLED, &b_m_enabled,
+            GAPC_PREFS_GRAPH, &ov_f_graph, -1);
+         d_value = g_settings_get_double(monitor_settings, key);
+         if (d_value != ov_f_graph) {
             gtk_list_store_set(GTK_LIST_STORE(pcfg->prefs_model), &iter,
-               GAPC_PREFS_GRAPH, f_value, -1);
+               GAPC_PREFS_GRAPH, d_value, -1);
          }
          if ((b_m_enabled) && (b_active_valid)) {
-            pm->d_graph = f_value;
+            pm->d_graph = d_value;
             pm->b_graph_control = TRUE;
          }
       }
-      if (g_str_equal(pkey, "host_name")) {
-         // XXX s_value = (gchar *) gconf_value_get_string(entry->value);
+      else if (g_str_equal(key, GAPC_HOST_KEY)) {
+         gtk_tree_model_get(
+            pcfg->prefs_model,
+            &iter,
+            GAPC_PREFS_ENABLED, &b_m_enabled,
+            GAPC_PREFS_HOST, &ov_s_host, -1);
+         s_value = g_settings_get_string(monitor_settings, key);
          i_len = g_snprintf(ch, GAPC_MAX_TEXT, "%s", s_value);
          if (i_len < 2) {
             s_value = g_strdup(GAPC_HOST_DEFAULT);
-            b_flag_dupped = TRUE;
          }
          if (!g_str_equal(s_value, ov_s_host)) {
             gtk_list_store_set(GTK_LIST_STORE(pcfg->prefs_model), &iter,
                GAPC_PREFS_HOST, s_value, -1);
          }
          if ((b_m_enabled) && (b_active_valid)) {
-            if (pm->pch_host != NULL) {
-               g_free(pm->pch_host);
-            }
+            g_clear_pointer(&pm->pch_host, g_free);
             pm->pch_host = g_strdup(s_value);
             pm->b_network_control = TRUE;
             if (pm->psk != NULL) {
@@ -4785,27 +4715,27 @@ static void cb_panel_preferences_gconf_changed(/* XXX GConfClient * client, guin
                 pm->psk->b_network_control = TRUE;
             }
          }
-         if (b_flag_dupped) {
-            g_free(s_value);
-            b_flag_dupped = FALSE;
-         }
-         if (ov_s_host) {
-            g_free(ov_s_host);
-         }
+         g_clear_pointer(&s_value, g_free);
+         g_clear_pointer(&ov_s_host, g_free);
       }
    }
-
-   if (pkey != NULL) {
-      g_free(pkey);
-   }
-   if (pch_value != NULL) {
-      g_free(pch_value);
-   }
-
    gdk_flush();
-   gdk_threads_leave();
 
    return;
+}
+static void signal_handler_monitor_settings_disconnect(
+   gchar *key,
+   GSettings *monitor_settings,
+   PGAPC_CONFIG pcfg)
+{
+   guint number_of_handlers;
+
+   g_return_if_fail(monitor_settings != NULL);
+
+   number_of_handlers = g_signal_handlers_disconnect_by_func(
+      monitor_settings,
+      G_CALLBACK(cb_panel_preferences_gsettings_changed),
+      pcfg);
 }
 
 /*
@@ -4819,8 +4749,18 @@ static gboolean gapc_panel_gsettings_destroy(PGAPC_CONFIG pcfg)
 
    guint number_of_handlers;
 
-   number_of_handlers = g_signal_handlers_disconnect_by_data(
+   g_hash_table_foreach(
+      pcfg->pht_Monitor_Settings,
+      (GHFunc)signal_handler_monitor_settings_disconnect,
+      pcfg);
+
+   if (pcfg->pht_Monitor_Settings != NULL) {
+      g_hash_table_destroy(pcfg->pht_Monitor_Settings);
+      pcfg->pht_Monitor_Settings = NULL;
+   }
+   number_of_handlers = g_signal_handlers_disconnect_by_func(
       pcfg->controller_settings,
+      G_CALLBACK(controller_use_systray_changed),
       pcfg);
 
    // XXX if (pcfg->i_group_id > 0) {
@@ -4835,7 +4775,7 @@ static gboolean gapc_panel_gsettings_destroy(PGAPC_CONFIG pcfg)
    return TRUE;
 }
 
-static gboolean get_color_property_value_from_color_setting(
+static gboolean color_property_value_get(
    GValue *color_property_value,
    GVariant *color_setting,
    gpointer user_data) {
@@ -4853,7 +4793,7 @@ static gboolean get_color_property_value_from_color_setting(
    return FALSE;
 }
 
-static GVariant * set_color_setting_from_color_property_value(
+static GVariant * color_setting_set(
    const GValue *color_property_value,
    const GVariantType *expected_type,
    gpointer user_data)
@@ -4862,9 +4802,23 @@ static GVariant * set_color_setting_from_color_property_value(
    gchar *color_string = gdk_color_to_string (color);
 
    GVariant *variant = g_variant_new_string (color_string);
-   g_free (color_string);
+   g_clear_pointer(&color_string, g_free);
 
    return variant;
+}
+
+static void signal_handler_monitor_settings_connect(
+   gchar *key,
+   GSettings *monitor_settings,
+   PGAPC_CONFIG pcfg)
+{
+   g_return_if_fail(monitor_settings != NULL);
+
+   g_signal_connect(
+      monitor_settings,
+      "changed",
+      G_CALLBACK(cb_panel_preferences_gsettings_changed),
+      pcfg);
 }
 
 /*
@@ -4874,23 +4828,7 @@ static GVariant * set_color_setting_from_color_property_value(
 */
 static gboolean gapc_panel_gsettings_watch(PGAPC_CONFIG pcfg)
 {
-   GError *gerror = NULL;
-
    g_return_val_if_fail(pcfg != NULL, FALSE);
-
-   /* Have gconf call us if something does change */ // FIXME COMMENT
-   // XXX pcfg->i_prefs_id =
-      // XXX gconf_client_notify_add(pcfg->client, GAPC_MID_GROUP_KEY,
-      // XXX (GConfClientNotifyFunc)
-      // XXX cb_panel_preferences_gconf_changed, pcfg, NULL, &gerror);
-   if (gerror != NULL) {
-      gapc_util_log_app_msg("gapc_panel_gsettings_watch",
-         "gconf_client_notify_add(prefs.group) Failed", gerror->message); // FIXME MESSAGE
-      g_error_free(gerror);
-      // XXX pcfg->i_group_id = 0;
-      gerror = NULL;
-      return FALSE;
-   }
 
    g_signal_connect(
       pcfg->controller_settings,
@@ -4911,8 +4849,8 @@ static gboolean gapc_panel_gsettings_watch(PGAPC_CONFIG pcfg)
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_LINEV_KEY),
       "color",
       G_SETTINGS_BIND_DEFAULT,
-      get_color_property_value_from_color_setting,
-      set_color_setting_from_color_property_value,
+      color_property_value_get,
+      color_setting_set,
       NULL,
       NULL);
 
@@ -4922,8 +4860,8 @@ static gboolean gapc_panel_gsettings_watch(PGAPC_CONFIG pcfg)
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_LOADPCT_KEY),
       "color",
       G_SETTINGS_BIND_DEFAULT,
-      get_color_property_value_from_color_setting,
-      set_color_setting_from_color_property_value,
+      color_property_value_get,
+      color_setting_set,
       NULL,
       NULL);
 
@@ -4933,8 +4871,8 @@ static gboolean gapc_panel_gsettings_watch(PGAPC_CONFIG pcfg)
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_TIMELEFT_KEY),
       "color",
       G_SETTINGS_BIND_DEFAULT,
-      get_color_property_value_from_color_setting,
-      set_color_setting_from_color_property_value,
+      color_property_value_get,
+      color_setting_set,
       NULL,
       NULL);
 
@@ -4944,8 +4882,8 @@ static gboolean gapc_panel_gsettings_watch(PGAPC_CONFIG pcfg)
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_BCHARGE_KEY),
       "color",
       G_SETTINGS_BIND_DEFAULT,
-      get_color_property_value_from_color_setting,
-      set_color_setting_from_color_property_value,
+      color_property_value_get,
+      color_setting_set,
       NULL,
       NULL);
 
@@ -4955,8 +4893,8 @@ static gboolean gapc_panel_gsettings_watch(PGAPC_CONFIG pcfg)
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_BATTV_KEY),
       "color",
       G_SETTINGS_BIND_DEFAULT,
-      get_color_property_value_from_color_setting,
-      set_color_setting_from_color_property_value,
+      color_property_value_get,
+      color_setting_set,
       NULL,
       NULL);
 
@@ -4966,8 +4904,8 @@ static gboolean gapc_panel_gsettings_watch(PGAPC_CONFIG pcfg)
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_WINDOW_KEY),
       "color",
       G_SETTINGS_BIND_DEFAULT,
-      get_color_property_value_from_color_setting,
-      set_color_setting_from_color_property_value,
+      color_property_value_get,
+      color_setting_set,
       NULL,
       NULL);
 
@@ -4977,8 +4915,8 @@ static gboolean gapc_panel_gsettings_watch(PGAPC_CONFIG pcfg)
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_CHART_KEY),
       "color",
       G_SETTINGS_BIND_DEFAULT,
-      get_color_property_value_from_color_setting,
-      set_color_setting_from_color_property_value,
+      color_property_value_get,
+      color_setting_set,
       NULL,
       NULL);
 
@@ -4988,10 +4926,15 @@ static gboolean gapc_panel_gsettings_watch(PGAPC_CONFIG pcfg)
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_TITLE_KEY),
       "color",
       G_SETTINGS_BIND_DEFAULT,
-      get_color_property_value_from_color_setting,
-      set_color_setting_from_color_property_value,
+      color_property_value_get,
+      color_setting_set,
       NULL,
       NULL);
+
+   g_hash_table_foreach(
+      pcfg->pht_Monitor_Settings,
+      (GHFunc)signal_handler_monitor_settings_connect,
+      pcfg);
 
    return TRUE;
 }
@@ -5062,14 +5005,8 @@ static void cb_monitor_interface_destroy(GtkWidget * widget, PGAPC_MONITOR pm)
    }
 
    for (h_index = 0; h_index < GAPC_MAX_ARRAY; h_index++) {
-      if (pm->pach_events[h_index] != NULL) {
-         g_free(pm->pach_events[h_index]);
-      }
-      pm->pach_events[h_index] = NULL;
-      if (pm->pach_status[h_index] != NULL) {
-         g_free(pm->pach_status[h_index]);
-      }
-      pm->pach_status[h_index] = NULL;
+      g_clear_pointer(&pm->pach_events[h_index], g_free);
+      g_clear_pointer(&pm->pach_status[h_index], g_free);
    }
 
    if (pm->tray_icon != NULL) {
@@ -5094,10 +5031,10 @@ static void cb_monitor_interface_destroy(GtkWidget * widget, PGAPC_MONITOR pm)
       pch = g_strdup_printf
          ("Monitor for %s Destroyed!...", pm->pch_host );
       gtk_statusbar_push(GTK_STATUSBAR(sbar), pcfg->i_info_context, pch);
-      g_free(pch);
+      g_clear_pointer(&pch, g_free);
    }
 
-   g_free(pm);
+   g_clear_pointer(&pm, g_free);
    return;
 }
 
@@ -5108,8 +5045,6 @@ static void cb_main_interface_destroy(GtkWidget * widget, PGAPC_CONFIG pcfg)
    g_return_if_fail(pcfg != NULL);
 
    pcfg->b_run = FALSE;
-
-   gapc_panel_gsettings_destroy(pcfg);
 
    if (GTK_IS_TREE_VIEW(pcfg->prefs_treeview)) {
       gtk_widget_destroy(GTK_WIDGET(pcfg->prefs_treeview));
@@ -5139,7 +5074,10 @@ static void cb_main_interface_destroy(GtkWidget * widget, PGAPC_CONFIG pcfg)
 
    g_object_unref (pcfg->tooltips);
 
+   gapc_panel_gsettings_destroy(pcfg);
+
    gtk_main_quit();
+
    return;
 }
 
@@ -5208,13 +5146,14 @@ static GtkWidget *gapc_main_interface_create(PGAPC_CONFIG pcfg)
    /* Create hash table for easy access to system widgets */
    pcfg->pht_Status = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
    pcfg->pht_Widgets = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+   pcfg->pht_Monitor_Settings = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_object_unref);
    pixbuf = pcfg->my_icons[GAPC_ICON_DEFAULT];
    pcfg->b_visible = FALSE;
    pcfg->tooltips = gtk_tooltips_new();
    g_object_ref (pcfg->tooltips);
    gtk_object_sink (GTK_OBJECT(pcfg->tooltips));
    pcfg->b_run = TRUE;
-   pcfg->cb_last_monitor_deleted = -1;
+   pcfg->cb_last_monitor_deleted = 0;
 
    /*
     * Create the top level window for the notebook to be packed into.*/
@@ -5336,8 +5275,8 @@ static GtkWidget *gapc_main_interface_create(PGAPC_CONFIG pcfg)
 */
 static gint gapc_monitor_history_page(PGAPC_MONITOR pm, GtkWidget * notebook)
 {
-   PGAPC_HISTORY pphs = (PGAPC_HISTORY) & pm->phs;
-   PGAPC_CONFIG pcfg = (PGAPC_CONFIG) pm->gp;
+   PGAPC_HISTORY pphs = NULL;
+   PGAPC_CONFIG pcfg = NULL;
    PLGRAPH       plg = NULL;
    gint i_page = 0, i_series = 0, h_index = 0;
    GtkWidget *label = NULL, *box = NULL;
@@ -5346,6 +5285,9 @@ static gint gapc_monitor_history_page(PGAPC_MONITOR pm, GtkWidget * notebook)
    gchar *pch_legend[] = { "LINEV", "LOADPCT", "TIMELEFT", "BCHARGE", "BATTV" };
 
    g_return_val_if_fail(pm != NULL, -1);
+
+   pphs = (PGAPC_HISTORY) & pm->phs;
+   pcfg = (PGAPC_CONFIG) pm->gp;
 
    /*
     * Prepare the environment */
@@ -5383,14 +5325,14 @@ static gint gapc_monitor_history_page(PGAPC_MONITOR pm, GtkWidget * notebook)
    if (plg != NULL) {
        for (i_series = 0; i_series < GAPC_LINEGRAPH_MAX_SERIES; i_series++) {
             lg_graph_data_series_add (plg, pch_legend[i_series], pch_colors[i_series]);
-            g_free (pch_colors[i_series]);
+            g_clear_pointer (&pch_colors[i_series], g_free);
        }
 
        pch = g_strdup_printf(
                  "<i>sampled every %3.1f seconds</i>",
                  pm->phs.d_xinc);
        lg_graph_set_x_label_text (plg, pch);
-       g_free(pch);
+       g_clear_pointer(&pch, g_free);
 
        lg_graph_set_chart_title (plg, pm->ch_title_info);
    }
@@ -5410,7 +5352,7 @@ static gint gapc_monitor_history_page(PGAPC_MONITOR pm, GtkWidget * notebook)
 /*
  * Add a new data point until xrange is reached
  * then rotate back the y points and add new point to end
- * return TRUE is successful, FALSE other wise
+ * return G_SOURCE_CONTINUE if successful, G_SOURCE_REMOVE otherwise
 */
 static gboolean cb_util_line_chart_refresh(PGAPC_HISTORY pg)
 {
@@ -5418,19 +5360,19 @@ static gboolean cb_util_line_chart_refresh(PGAPC_HISTORY pg)
    PLGRAPH plg = NULL;
    PGAPC_MONITOR pm = NULL;
 
-   g_return_val_if_fail(pg != NULL, FALSE);
+   g_return_val_if_fail(pg != NULL, G_SOURCE_REMOVE);
 
    pm = (PGAPC_MONITOR) pg->gp;
    plg = pg->plg;
-   g_return_val_if_fail(plg != NULL, FALSE);
-   g_return_val_if_fail(pm != NULL, FALSE);
+   g_return_val_if_fail(plg != NULL, G_SOURCE_REMOVE);
+   g_return_val_if_fail(pm != NULL, G_SOURCE_REMOVE);
 
    if (!pm->b_run)                 /* stop this timer */
-      return FALSE;
+      return G_SOURCE_REMOVE;
 
    if (pm->b_graph_control) {
       g_timeout_add(100, (GSourceFunc) cb_util_line_chart_refresh_control, pm);
-      return FALSE;
+      return G_SOURCE_REMOVE;
    }
 
 
@@ -5453,11 +5395,11 @@ static gboolean cb_util_line_chart_refresh(PGAPC_HISTORY pg)
 
    if (pg->b_startup) {
      pg->b_startup = FALSE;
-     return FALSE;
+     return G_SOURCE_REMOVE;
    }
 
    /* first data point collected */
-   return TRUE;
+   return G_SOURCE_CONTINUE;
 }
 
 
@@ -5495,17 +5437,17 @@ static PLGRAPH lg_graph_create (GtkWidget * box, gint width, gint height)
 
     pstring = g_settings_get_string(pcfg->controller_settings, GAPC_COLOR_TITLE_KEY);
     lg_graph_set_chart_title_color (plg, pstring);
-    g_free (pstring);
+    g_clear_pointer (&pstring, g_free);
 
     lg_graph_set_chart_scales_color (plg, "black");
 
     pstring = g_settings_get_string(pcfg->controller_settings, GAPC_COLOR_CHART_KEY);
     lg_graph_set_chart_window_fg_color (plg, pstring);
-    g_free (pstring);
+    g_clear_pointer (&pstring, g_free);
 
     pstring = g_settings_get_string(pcfg->controller_settings, GAPC_COLOR_WINDOW_KEY);
     lg_graph_set_chart_window_bg_color (plg, pstring);
-    g_free (pstring);
+    g_clear_pointer (&pstring, g_free);
 
     /* Xminor divisions, Xmajor divisions, Xbotton scale, Xtop scale, ...y */
     lg_graph_set_ranges (plg, 1, 2, 0, 40, 2, 10, 0, 110);
@@ -5554,14 +5496,14 @@ static PLGRAPH lg_graph_create (GtkWidget * box, gint width, gint height)
     gdk_gc_set_rgb_fg_color (plg->title_gc, &color);
 
     /* --- Signals used to handle backing pixmap --- */
-    gtk_signal_connect (GTK_OBJECT (drawing_area), "configure_event",
-                        (GtkSignalFunc) lg_graph_configure_event_cb, plg);
-    gtk_signal_connect (GTK_OBJECT (drawing_area), "expose_event",
-                        (GtkSignalFunc) lg_graph_expose_event_cb, plg);
-    gtk_signal_connect (GTK_OBJECT (drawing_area), "motion_notify_event",
-                        (GtkSignalFunc) lg_graph_motion_notify_event_cb, plg);
-    gtk_signal_connect (GTK_OBJECT (drawing_area), "button_press_event",
-                        (GtkSignalFunc) lg_graph_button_press_event_cb, plg);
+    g_signal_connect (drawing_area, "configure_event",
+                      G_CALLBACK(lg_graph_configure_event_cb), plg);
+    g_signal_connect (drawing_area, "expose_event",
+                      G_CALLBACK(lg_graph_expose_event_cb), plg);
+    g_signal_connect (drawing_area, "motion_notify_event",
+                      G_CALLBACK(lg_graph_motion_notify_event_cb), plg);
+    g_signal_connect (drawing_area, "button_press_event",
+                      G_CALLBACK(lg_graph_button_press_event_cb), plg);
 
     return plg;
 }
@@ -5978,7 +5920,7 @@ static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebo
 /*
  * Creates monitor interface with the normal panels
 */
-static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, gint i_monitor,
+static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, guint i_monitor,
    GtkTreeIter * iter)
 {
    GtkWindow *window = NULL;
@@ -5987,7 +5929,9 @@ static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, gint i_monito
    GtkWidget *label = NULL, *button = NULL;
    GtkWidget *bbox = NULL, *lbox = NULL, *nbox = NULL, *box = NULL;
    PGAPC_MONITOR pm = NULL;
-   gint z_monitor = 0;
+   guint z_monitor = 0;
+   guint16 h_monitor = 0;
+   gchar *monitor_settings_key = NULL;
 
    g_return_val_if_fail(pcfg != NULL, NULL);
 
@@ -6016,9 +5960,7 @@ static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, gint i_monito
    pm->i_old_icon_index = GAPC_ICON_ONLINE;
    pm->tray_icon = NULL;
    pm->tray_image = NULL;
-   if (pm->pch_host != NULL) {
-      g_free(pm->pch_host);
-   }
+   g_clear_pointer(&pm->pch_host, g_free);
    gtk_tree_model_get(GTK_TREE_MODEL(pcfg->prefs_model), iter,
       GAPC_PREFS_SYSTRAY, &(pm->cb_use_systray),
       GAPC_PREFS_PORT, &(pm->i_port),
@@ -6033,7 +5975,12 @@ static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, gint i_monito
    g_object_ref (pm->tooltips);
    gtk_object_sink (GTK_OBJECT(pm->tooltips));
    pm->gm_update = g_mutex_new();
-   // XXX pm->client = pcfg->client;
+   h_monitor = (guint16)i_monitor;
+   monitor_settings_key = g_strdup_printf(GAPC_MONITOR_NAME_OUTPUT_FORMAT, h_monitor);
+   pm->monitor_settings = g_hash_table_lookup(
+      pcfg->pht_Monitor_Settings,
+      monitor_settings_key);
+   g_clear_pointer(&monitor_settings_key, g_free);
    pm->i_old_icon_index = GAPC_ICON_DEFAULT;
    pm->monitor_model = pcfg->monitor_model;
    g_snprintf(pm->ch_title_info, GAPC_MAX_TEXT, "%s {%s}", GAPC_WINDOW_TITLE,
@@ -6181,7 +6128,7 @@ static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, gint i_monito
       pch = g_strdup_printf
          ("Monitor for %s Created!...", pm->pch_host);
       gtk_statusbar_push(GTK_STATUSBAR(sbar), pcfg->i_info_context, pch);
-      g_free(pch);
+      g_clear_pointer(&pch, g_free);
    }
 
    return GTK_WIDGET(window);
@@ -6190,7 +6137,7 @@ static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, gint i_monito
 /*
  * Creates monitor interface with the normal panels
 */
-static void gapc_monitor_interface_destroy(PGAPC_CONFIG pcfg, gint i_monitor)
+static void gapc_monitor_interface_destroy(PGAPC_CONFIG pcfg, guint i_monitor)
 {
    GtkTreeIter iter;
    PGAPC_MONITOR pm = NULL;

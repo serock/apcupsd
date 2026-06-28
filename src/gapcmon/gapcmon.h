@@ -45,8 +45,10 @@ G_BEGIN_DECLS
 #define GAPC_CONTROLLER_SCHEMA_ID "org.apcupsd.Gapcmon.controller"
 #define GAPC_MONITOR_SCHEMA_ID    "org.apcupsd.Gapcmon.monitor"
 
-#define GAPC_MONITOR_NAME_FORMAT "%04hx"
-#define GAPC_MONITOR_PATH_FORMAT "/org/apcupsd/gapcmon/monitors:/" GAPC_MONITOR_NAME_FORMAT "/"
+#define GAPC_MONITOR_NAME_INPUT_FORMAT  "%4x"
+#define GAPC_MONITOR_NAME_OUTPUT_FORMAT "%04hx"
+#define GAPC_MONITOR_PATH_INPUT_FORMAT  "/org/apcupsd/gapcmon/monitors:/" GAPC_MONITOR_NAME_INPUT_FORMAT "/"
+#define GAPC_MONITOR_PATH_OUTPUT_FORMAT "/org/apcupsd/gapcmon/monitors:/" GAPC_MONITOR_NAME_OUTPUT_FORMAT "/"
 
 #define GAPC_MONITOR_NAMES_KEY  "monitor-names"
 
@@ -119,7 +121,7 @@ typedef enum _Control_Block_id {
     CB_N_ID
 } GAPCDataID;
 
-   typedef enum _State_Icons_IDs {
+typedef enum _State_Icons_IDs {
    GAPC_ICON_ONLINE,
    GAPC_ICON_ONBATT,
    GAPC_ICON_CHARGING,
@@ -128,13 +130,6 @@ typedef enum _Control_Block_id {
    GAPC_ICON_NETWORKERROR,
    GAPC_N_ICONS
 } GAPC_IconType;
-
-typedef enum _Timer_IDs {
-   GAPC_TIMER_AUTO,
-   GAPC_TIMER_DEDICATED,
-   GAPC_TIMER_CONTROL,
-   GAPC_N_TIMERS
-} GAPC_TimerType;
 
 typedef enum _Prefs_Store_IDs {
    GAPC_PREFS_MONITOR,
@@ -170,19 +165,11 @@ typedef struct _Preferences_Key_Records {
 /* Control structure for TreeView columns and callbacks */
 typedef struct _Prefs_Column_Data {
    GAPCDataID cb_id;               /* This is REQUIRED TO BE 1ST in struct */
-   guint cb_monitor_num;           /* monitor number 1-based */
    guint i_col_num;
+   GHashTable *pht_Monitor_Settings;
    GtkTreeModel *prefs_model;      /* GtkListStore */
 
 } GAPC_PREFS_COLUMN, *PGAPC_PREFS_COLUMN;
-
-typedef struct _Monitor_Column_Data {
-   GAPCDataID cb_id;                  /* This is REQUIRED TO BE 1ST in struct */
-   guint cb_monitor_num;           /* monitor number 1-based */
-   guint i_col_num;
-   GtkTreeModel *monitor_model;    /* GtkListStore */
-
-} GAPC_MON_COLUMN, *PGAPC_MON_COLUMN;
 
 typedef struct _GAPC_H_CHART {
    GAPCDataID cb_id;
@@ -298,10 +285,10 @@ typedef struct _Monitor_Instance_Data {
    gboolean cb_enabled;
    gboolean cb_use_systray;
    gchar *pch_host;
-   gint i_port;
-   gint i_watt;                    /* rated wattage of UPS*/
-   gfloat d_refresh;
-   gfloat d_graph;                 /* End Preference values */
+   guint i_port;
+   guint i_watt;                   /* rated wattage of UPS*/
+   gdouble d_refresh;
+   gdouble d_graph;                /* End Preference values */
 
    gchar ch_title_info[GAPC_MAX_TEXT];
 
@@ -390,6 +377,7 @@ typedef struct _System_Control_Data {
 
    GHashTable *pht_Widgets;        /* hashtable holding widget ptrs  */
    GHashTable *pht_Status;         /* hashtable holding status text  */
+   GHashTable *pht_Monitor_Settings;
    guint i_info_context;           /* StatusBar Context */
    GdkPixbuf *my_icons[GAPC_N_ICONS + 8];
 
