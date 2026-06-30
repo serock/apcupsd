@@ -412,10 +412,10 @@ static gint lg_graph_data_series_add (PLGRAPH plg, gchar * pch_legend_text,
     g_return_val_if_fail (pch_legend_text != NULL, -1);
     g_return_val_if_fail (pch_color_text != NULL, -1);
 
-    psd = (PLG_SERIES) g_new0 (LG_SERIES, 1);
+    psd = g_new0 (LG_SERIES, 1);
     g_return_val_if_fail (psd != NULL, -1);
 
-    psd->lg_point_dvalue = (gdouble *) g_new0 (gdouble, (plg->x_range.i_max_scale + 4));
+    psd->lg_point_dvalue = g_new0 (gdouble, (plg->x_range.i_max_scale + 4));
     g_return_val_if_fail (psd->lg_point_dvalue != NULL, -1);
 
     psd->point_pos = g_new0 (GdkPoint, (plg->x_range.i_max_scale + 4));
@@ -1965,7 +1965,7 @@ static gboolean gapc_monitor_update_tooltip_msg(PGAPC_MONITOR pm)
    g_clear_pointer(&pmsg, g_free);
    g_clear_pointer(&ptitle, g_free);
 
-/*  g_clear_pointer (&pmview, g_free); */
+   g_clear_pointer (&pmview, g_free);
 
    return b_flag;
 }
@@ -2993,7 +2993,7 @@ static gint gapc_panel_monitor_model_rec_add(PGAPC_CONFIG pcfg, PGAPC_MONITOR pm
    gtk_list_store_set(GTK_LIST_STORE(pcfg->monitor_model), &iter, GAPC_MON_ICON,
       pm->my_icons[pm->i_icon_index], GAPC_MON_STATUS,
       pm->ch_title_info, GAPC_MON_MONITOR, pm->cb_monitor_num,
-      GAPC_MON_POINTER, (gpointer) pm, GAPC_MON_UPSSTATE, g_strdup(pch), -1);
+      GAPC_MON_POINTER, (gpointer) pm, GAPC_MON_UPSSTATE, pch, -1);
 
    gtk_tree_selection_select_iter(pcfg->monitor_select, &iter);
 
@@ -4486,7 +4486,6 @@ static void cb_main_interface_button_quit(GtkWidget * button, PGAPC_CONFIG pcfg)
       if ((pm != NULL) && (pm->window != NULL)) {
          pm->b_run = FALSE;
          gtk_widget_destroy(GTK_WIDGET(pm->window));
-         pm->window = NULL;
          pm = NULL;
       }
       valid = gtk_tree_model_iter_next(pcfg->monitor_model, &iter);
@@ -5015,8 +5014,8 @@ static void cb_monitor_interface_destroy(GtkWidget * widget, PGAPC_MONITOR pm)
       pm->tray_image = NULL;
    }
    if (pm->menu != NULL) {
-      gtk_widget_destroy(GTK_WIDGET(pm->menu));
-      pm->menu = NULL;
+      gtk_widget_destroy(pm->menu);
+      g_clear_object(&pm->menu);
    }
 
    g_object_unref (pm->tooltips);
@@ -5033,7 +5032,16 @@ static void cb_monitor_interface_destroy(GtkWidget * widget, PGAPC_MONITOR pm)
       gtk_statusbar_push(GTK_STATUSBAR(sbar), pcfg->i_info_context, pch);
       g_clear_pointer(&pch, g_free);
    }
-
+   g_clear_pointer(&pm->pch_host, g_free);
+   g_clear_pointer(&pm->phs.plg->x_label_text, g_free);
+   g_clear_pointer(&pm->phs.plg->y_label_text, g_free);
+   g_clear_pointer(&pm->phs.plg->x_title_text, g_free);
+   g_clear_object(&pm->phs.plg->window_gc);
+   g_clear_object(&pm->phs.plg->box_gc);
+   g_clear_object(&pm->phs.plg->scale_gc);
+   g_clear_object(&pm->phs.plg->title_gc);
+   g_clear_object(&pm->phs.plg->series_gc);
+   g_clear_pointer(&pm->phs.plg, g_free);
    g_clear_pointer(&pm, g_free);
    return;
 }
@@ -6107,7 +6115,8 @@ static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, guint i_monit
       g_timeout_add((guint) (pm->d_refresh * GAPC_REFRESH_FACTOR_1K),
       (GSourceFunc) cb_monitor_automatic_refresh, pm);
 
-   pm->menu = menu = gtk_menu_new();
+   pm->menu = g_object_ref_sink(gtk_menu_new());
+   menu = pm->menu;
    menu_item = gtk_image_menu_item_new_from_stock(GTK_STOCK_JUMP_TO, NULL);
    g_signal_connect(G_OBJECT(menu_item), "activate",
       G_CALLBACK(cb_util_popup_menu_response_jumpto), pm);
@@ -6167,6 +6176,7 @@ static void gapc_monitor_interface_destroy(PGAPC_CONFIG pcfg, guint i_monitor)
 
    if (pm->menu != NULL) {
       gtk_widget_destroy(pm->menu);
+      g_clear_object(&pm->menu);
    }
 
    if (pm->window != NULL) {
