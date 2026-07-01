@@ -3402,23 +3402,20 @@ static void cb_panel_prefs_handle_cell_toggled(GtkCellRendererToggle * cell,
    gtk_tree_model_get(model, &iter, col_number, &b_value, GAPC_PREFS_MONITOR,
       &i_monitor, -1);
 
+   h_monitor = (guint16)i_monitor;
+   monitor_settings_key = g_strdup_printf(GAPC_MONITOR_NAME_OUTPUT_FORMAT, h_monitor);
+   monitor_settings = g_hash_table_lookup(pcolumn->pht_Monitor_Settings, monitor_settings_key);
+   g_clear_pointer(&monitor_settings_key, g_free);
+
    /* do something with the value */
    b_value ^= 1;
 
    switch (col_number) {
    case GAPC_PREFS_ENABLED:
-      h_monitor = (guint16)i_monitor;
-      monitor_settings_key = g_strdup_printf(GAPC_MONITOR_NAME_OUTPUT_FORMAT, h_monitor);
-      monitor_settings = g_hash_table_lookup(pcolumn->pht_Monitor_Settings, monitor_settings_key);
       g_settings_set_boolean(monitor_settings, GAPC_ENABLE_KEY, b_value);
-      g_clear_pointer(&monitor_settings_key, g_free);
       break;
    case GAPC_PREFS_SYSTRAY:
-      h_monitor = (guint16)i_monitor;
-      monitor_settings_key = g_strdup_printf(GAPC_MONITOR_NAME_OUTPUT_FORMAT, h_monitor);
-      monitor_settings = g_hash_table_lookup(pcolumn->pht_Monitor_Settings, monitor_settings_key);
       g_settings_set_boolean(monitor_settings, GAPC_SYSTRAY_KEY, b_value);
-      g_clear_pointer(&monitor_settings_key, g_free);
       break;
    default:
       g_message("Cell_Toggled:Unknown key for Value(%s)\n",
@@ -3447,11 +3444,14 @@ static void cb_panel_prefs_handle_cell_edited(GtkCellRendererText * cell,
    GtkTreeModel *model;
    GtkTreeIter iter;
    GtkTreePath *path;
-   gint col_number = 0, i_port = 0, i_len = 0;
+   gint col_number = 0;
+   gsize i_len = 0;
    guint i_monitor = 0;
+   guint16 h_monitor = 0;
    gdouble f_refresh = 0.0, f_graph = 0.0;
-   gchar ch[GAPC_MAX_TEXT], *pch = NULL;
-   gboolean b_dupped = FALSE;
+   gchar *pch = NULL;
+   gchar *monitor_settings_key = NULL;
+   GSettings *monitor_settings = NULL;
 
    g_return_if_fail(pcolumn != NULL);
    g_return_if_fail(pch_new != NULL);
@@ -3460,7 +3460,7 @@ static void cb_panel_prefs_handle_cell_edited(GtkCellRendererText * cell,
    model = pcolumn->prefs_model;
    col_number = pcolumn->i_col_num;
 
-   i_len = g_snprintf(ch, GAPC_MAX_TEXT, "%s", pch_new);
+   i_len = strlen(pch_new);
    /*
     * get iter to record
     */
@@ -3473,97 +3473,59 @@ static void cb_panel_prefs_handle_cell_edited(GtkCellRendererText * cell,
     */
    gtk_tree_model_get(model, &iter, GAPC_PREFS_MONITOR, &i_monitor, -1);
 
+   h_monitor = (guint16)i_monitor;
+   monitor_settings_key = g_strdup_printf(GAPC_MONITOR_NAME_OUTPUT_FORMAT, h_monitor);
+   monitor_settings = g_hash_table_lookup(pcolumn->pht_Monitor_Settings, monitor_settings_key);
+   g_clear_pointer(&monitor_settings_key, g_free);
+
    switch (col_number) {
    case GAPC_PREFS_HOST:
-      {
-         gchar *phost = g_strdup_printf(GAPC_HOST_KEY, i_monitor);// XXX FIXME
-
-         if ((pch_new == NULL) || (i_len < 2)) {
-            pch = g_strdup(GAPC_HOST_DEFAULT);
-         } else {
-            pch = pch_new;
-            b_dupped = TRUE;
-         }
-         // XXX gconf_client_set_string(pcolumn->client, phost, pch, NULL);
-         g_clear_pointer(&phost, g_free);
+      if ((pch_new == NULL) || (i_len < 2)) {
+         pch = g_strdup(GAPC_HOST_DEFAULT);
+      } else {
+         pch = g_strdup(pch_new);
       }
+      g_settings_set_string(monitor_settings, GAPC_HOST_KEY, pch);
+      g_clear_pointer(&pch, g_free);
       break;
    case GAPC_PREFS_PORT:
-      {
-         gchar *pport = g_strdup_printf(GAPC_PORT_KEY, i_monitor);// XXX FIXME
+      guint64 i_port = g_ascii_strtoull(pch_new, NULL, 10);
+      guint16 h_port = (guint16)i_port;
 
-         i_port = (gint) g_strtod(pch_new, NULL);
-
-         if (i_port == 0) {
-            i_port = GAPC_PORT_DEFAULT;
-            pch = g_strdup_printf("%d", i_port);
-         } else {
-            pch = pch_new;
-            b_dupped = TRUE;
-         }
-         // XXX gconf_client_set_int(pcolumn->client, pport, i_port, NULL);
-         g_clear_pointer(&pport, g_free);
+      if (h_port == 0) {
+         h_port = GAPC_PORT_DEFAULT;
       }
+      g_settings_set(monitor_settings, GAPC_PORT_KEY, "q", h_port);
       break;
    case GAPC_PREFS_WATT:
-      {
-         gchar *pport = g_strdup_printf(GAPC_WATT_KEY, i_monitor);// XXX FIXME
+      guint64 i_watt = g_ascii_strtoull(pch_new, NULL, 10);
+      guint16 h_watt = (guint16)i_watt;
 
-         i_port = (gint) g_strtod(pch_new, NULL);
-
-         if (i_port == 0) {
-            i_port = GAPC_WATT_DEFAULT;
-            pch = g_strdup_printf("%d", i_port);
-         } else {
-            pch = pch_new;
-            b_dupped = TRUE;
-         }
-         // XXX gconf_client_set_int(pcolumn->client, pport, i_port, NULL);
-         g_clear_pointer(&pport, g_free);
+      if (h_watt == 0) {
+         h_watt = GAPC_WATT_DEFAULT;
       }
+      g_settings_set(monitor_settings, GAPC_WATT_KEY, "q", h_watt);
       break;
    case GAPC_PREFS_REFRESH:
-      {
-         gchar *prefresh = g_strdup_printf(GAPC_REFRESH_KEY, i_monitor);// XXX FIXME
+      f_refresh = g_strtod(pch_new, NULL);
 
-         f_refresh = g_strtod(pch_new, NULL);
-
-         if (f_refresh < GAPC_REFRESH_MIN_INCREMENT) {
-            f_refresh = GAPC_REFRESH_DEFAULT;
-            pch = g_strdup_printf("%3.1f", f_refresh);
-         } else {
-            pch = pch_new;
-            b_dupped = TRUE;
-         }
-         // XXX gconf_client_set_float(pcolumn->client, prefresh, f_refresh, NULL);
-         g_clear_pointer(&prefresh, g_free);
+      if (f_refresh < GAPC_REFRESH_MIN_INCREMENT) {
+         f_refresh = GAPC_REFRESH_DEFAULT;
       }
+      g_settings_set_double(monitor_settings, GAPC_REFRESH_KEY, f_refresh);
       break;
    case GAPC_PREFS_GRAPH:
-      {
-         gchar *prefresh = g_strdup_printf(GAPC_GRAPH_KEY, i_monitor);// XXX FIXME
+      f_graph = g_strtod(pch_new, NULL);
 
-         f_graph = g_strtod(pch_new, NULL);
-
-         if (f_graph < GAPC_REFRESH_MIN_INCREMENT) {
-            f_graph = GAPC_LINEGRAPH_REFRESH_FACTOR;
-            pch = g_strdup_printf("%3.1f", f_graph);
-         } else {
-            pch = pch_new;
-            b_dupped = TRUE;
-         }
-         // XXX gconf_client_set_float(pcolumn->client, prefresh, f_graph, NULL);
-         g_clear_pointer(&prefresh, g_free);
+      if (f_graph < GAPC_REFRESH_MIN_INCREMENT) {
+         f_graph = GAPC_LINEGRAPH_REFRESH_FACTOR;
       }
+      g_settings_set_double(monitor_settings, GAPC_GRAPH_KEY, f_graph);
       break;
    default:
       g_message("Cell_Edited:Unknown key for Value(%s)\n", pch_new);
       g_object_set(cell, "text", pch_new, NULL);
       break;
-   }
-
-   if (!b_dupped) {
-      g_clear_pointer(&pch, g_free);
    }
    return;
 }
@@ -4762,14 +4724,8 @@ static gboolean gapc_panel_gsettings_destroy(PGAPC_CONFIG pcfg)
       G_CALLBACK(controller_use_systray_changed),
       pcfg);
 
-   // XXX if (pcfg->i_group_id > 0) {
-      // XXX gconf_client_notify_remove(pcfg->client, pcfg->i_prefs_id);
-   // XXX }
    g_clear_object(&pcfg->controller_settings);
    g_clear_object(&pcfg->app_settings);
-
-   // XXX pcfg->i_group_id = 0;
-   // XXX pcfg->i_prefs_id = 0;
 
    return TRUE;
 }

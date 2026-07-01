@@ -349,7 +349,6 @@ typedef struct _System_Control_Data {
    gboolean b_run;                 /* operational flag */
    GSettings *app_settings;
    GSettings *controller_settings;
-   // XXX guint i_prefs_id;               /* GCONF dir notify ids - prefs-view */
 
    GtkWidget *window;
    GtkWidget *menu;                /* Popup Menu */
