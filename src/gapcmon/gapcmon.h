@@ -45,7 +45,7 @@ G_BEGIN_DECLS
 #define GAPC_CONTROLLER_SCHEMA_ID "org.apcupsd.Gapcmon.controller"
 #define GAPC_MONITOR_SCHEMA_ID    "org.apcupsd.Gapcmon.monitor"
 
-#define GAPC_MONITOR_NAME_INPUT_FORMAT  "%4x"
+#define GAPC_MONITOR_NAME_INPUT_FORMAT  "%4hx"
 #define GAPC_MONITOR_NAME_OUTPUT_FORMAT "%04hx"
 #define GAPC_MONITOR_PATH_INPUT_FORMAT  "/org/apcupsd/gapcmon/monitors:/" GAPC_MONITOR_NAME_INPUT_FORMAT "/"
 #define GAPC_MONITOR_PATH_OUTPUT_FORMAT "/org/apcupsd/gapcmon/monitors:/" GAPC_MONITOR_NAME_OUTPUT_FORMAT "/"
@@ -343,7 +343,6 @@ typedef struct _Monitor_Instance_Data {
 /* * Control structure for root panel object -- this is the anchor */
 typedef struct _System_Control_Data {
    GAPCDataID cb_id;                  /* This is REQUIRED TO BE 1ST in struct  */
-   GList *cb_glist_monitors;       /* assumed to point to  PGAPC_MONITOR */
    guint cb_last_monitor;          /* last selected from icon list - 1-based */
    gboolean b_tooltips;
    gboolean b_run;                 /* operational flag */
@@ -357,7 +356,6 @@ typedef struct _System_Control_Data {
    GtkTreeModel *prefs_model;      /* GtkListStore */
    GtkTreeView *prefs_treeview;
    GtkTreeSelection *prefs_select;
-   guint prefs_last_monitor;       /* assigning monitor numbers */
    guint cb_last_monitor_deleted;  // XXX /* overide gconf inconsistency on kde */
 
    GtkTreeModel *monitor_model;    /* GtkListStore */

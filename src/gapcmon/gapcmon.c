@@ -57,7 +57,7 @@
  *                      a GAsyncQueue, with additional instance mutex
  *                          - protect hash table from multi-thread access
  *                          - protect GTK from multi-thread access
- *                            gdk_thread_[enter|leave] around gtk calls in timer
+ *                            gdk_threads_[enter|leave] around gtk calls in timer
  *                            routines and threads - and gtk_main_loop.
  * ------------------------ ---------------------------------------------------
  *  GCONF2 Info // FIXME
@@ -2742,43 +2742,101 @@ static gboolean gapc_util_treeview_get_iter_from_monitor(GtkTreeModel * model,
    return b_result;
 }
 
+static int gapc_monitor_names_compare(
+   const gchar * name1,
+   const gchar * name2)
+{
+   return g_strcmp0(name1, name2);
+}
+
+static int gapc_monitor_names_compare_data(
+   const gchar * name1,
+   const gchar * name2,
+   gpointer user_data)
+{
+   return gapc_monitor_names_compare(name1, name2);
+}
+
+static void gapc_strv_builder_add_string(
+   gchar *str,
+   GStrvBuilder *builder)
+{
+    g_strv_builder_add(builder, str);
+}
+
+static GQueue *gapc_create_monitor_names_queue(PGAPC_CONFIG pcfg)
+{
+   guint16 h_monitor = 0;
+   guint16 h_prev_monitor = 0;
+   gchar **monitor_names = NULL;
+   guint monitor_names_count = 0;
+   GQueue *monitor_names_queue = NULL;
+
+   monitor_names = g_settings_get_strv(pcfg->app_settings, GAPC_MONITOR_NAMES_KEY);
+   monitor_names_count = g_strv_length(monitor_names);
+   monitor_names_queue = g_queue_new();
+   if (monitor_names_count > 0) {
+      for (int i = 0; monitor_names[i] != NULL; i++) {
+         if (sscanf(monitor_names[i], GAPC_MONITOR_NAME_INPUT_FORMAT, &h_monitor) == 1 &&
+             h_monitor != 0 &&
+             h_monitor != h_prev_monitor) {
+            g_queue_push_tail(monitor_names_queue, g_strdup(monitor_names[i]));
+            h_prev_monitor = h_monitor;
+         }
+      }
+   }
+   g_clear_pointer(&monitor_names, g_strfreev);
+   if (g_queue_get_length(monitor_names_queue) > 1) {
+      g_queue_sort(
+         monitor_names_queue,
+         (GCompareDataFunc)gapc_monitor_names_compare_data,
+         NULL);
+   }
+   return monitor_names_queue;
+}
+
 /*
- * Add a preferences record to the gconf instance and prefs_model // FIXME
+ * Add a monitor to GSettings
  * returns FALSE on error
  * returns TRUE on success
 */
-static gboolean gapc_panel_preferences_gconf_add_rec(PGAPC_CONFIG pcfg, // FIXME
-   gint i_monitor)
+static gboolean gapc_panel_preferences_gsettings_add_monitor(PGAPC_CONFIG pcfg)
 {
-   GAPC_PKEYS pk;
-   gchar *pkey = NULL;
+   GStrvBuilder *builder = NULL;
+   gchar *head = NULL;
+   guint16 h_monitor = 0;
+   gchar **monitor_names = NULL;
+   GQueue *monitor_names_queue = NULL;
+   gchar *tail = NULL;
 
    g_return_val_if_fail(pcfg != NULL, FALSE);
-   // XXX g_return_val_if_fail(pcfg->client != NULL, FALSE);
+   g_return_val_if_fail(pcfg->app_settings != NULL, FALSE);
    g_return_val_if_fail(pcfg->prefs_model != NULL, FALSE);
 
-   // XXX pkey = GAPC_MID_GROUP_KEY;
-   g_snprintf(pk.k_enabled, GAPC_MAX_TEXT, "%s/%d/%s", pkey, i_monitor, "enabled");
-   g_snprintf(pk.k_use_systray, GAPC_MAX_TEXT, "%s/%d/%s", pkey, i_monitor,
-      "use_systray");
-   g_snprintf(pk.k_port_number, GAPC_MAX_TEXT, "%s/%d/%s", pkey, i_monitor,
-      "port_number");
-   g_snprintf(pk.k_network_interval, GAPC_MAX_TEXT, "%s/%d/%s", pkey, i_monitor,
-      "network_interval");
-   g_snprintf(pk.k_graph_interval, GAPC_MAX_TEXT, "%s/%d/%s", pkey, i_monitor,
-      "graph_interval");
-   g_snprintf(pk.k_host_name, GAPC_MAX_TEXT, "%s/%d/%s", pkey, i_monitor,
-      "host_name");
-   g_snprintf(pk.v_host_name, GAPC_MAX_TEXT, "%s", GAPC_HOST_DEFAULT);
-
-   // XXX gconf_client_set_bool(pcfg->client, pk.k_enabled, FALSE, NULL);
-   // XXX gconf_client_set_bool(pcfg->client, pk.k_use_systray, FALSE, NULL);
-   // XXX gconf_client_set_int(pcfg->client, pk.k_port_number, GAPC_PORT_DEFAULT, NULL);
-   // XXX gconf_client_set_float(pcfg->client, pk.k_network_interval, GAPC_REFRESH_DEFAULT,
-   // XXX    NULL);
-   // XXX gconf_client_set_float(pcfg->client, pk.k_graph_interval,
-   // XXX    GAPC_LINEGRAPH_REFRESH_FACTOR, NULL);
-   // XXX gconf_client_set_string(pcfg->client, pk.k_host_name, pk.v_host_name, NULL);
+   monitor_names_queue = gapc_create_monitor_names_queue(pcfg);
+   if (!g_queue_is_empty(monitor_names_queue)) {
+      tail = g_queue_peek_tail(monitor_names_queue);
+      sscanf(tail, GAPC_MONITOR_NAME_INPUT_FORMAT, &h_monitor);
+      tail = NULL;
+   }
+   h_monitor += 1;
+   g_queue_push_tail(
+      monitor_names_queue,
+      g_strdup_printf(GAPC_MONITOR_NAME_OUTPUT_FORMAT, h_monitor));
+   builder = g_strv_builder_new();
+   g_queue_foreach(
+      monitor_names_queue,
+      (GFunc)gapc_strv_builder_add_string,
+      builder);
+   g_queue_free_full(monitor_names_queue, g_free);
+   monitor_names_queue = NULL;
+   monitor_names = g_strv_builder_unref_to_strv(builder);
+   g_settings_set_strv(
+      pcfg->app_settings,
+      GAPC_MONITOR_NAMES_KEY,
+      (const gchar * const *)monitor_names);
+   g_settings_sync();
+   g_clear_pointer(&monitor_names, g_strfreev);
 
    return TRUE;
 }
@@ -3082,17 +3140,6 @@ static gint gapc_panel_preferences_model_rec_remove(PGAPC_CONFIG pcfg)
    return result;
 }
 
-static gint gapc_panel_preferences_model_rec_add(PGAPC_CONFIG pcfg)
-{
-   g_return_val_if_fail(pcfg != NULL, -1);
-   g_return_val_if_fail(pcfg->prefs_model != NULL, -1);
-   g_return_val_if_fail(pcfg->prefs_select != NULL, -1);
-
-   gapc_panel_preferences_gconf_add_rec(pcfg, ++pcfg->prefs_last_monitor); // FIXME
-
-   return TRUE;
-}
-
 /*
  * EggTrayIcon Callbacks
 */
@@ -3350,8 +3397,10 @@ static gboolean gapc_panel_systray_icon_remove(gpointer gp)
 static void cb_panel_prefs_button_add_rec(GtkWidget * button, PGAPC_CONFIG pcfg)
 {
    g_return_if_fail(pcfg != NULL);
+   g_return_if_fail(pcfg->app_settings != NULL);
+   g_return_if_fail(pcfg->prefs_model != NULL);
 
-   gapc_panel_preferences_model_rec_add(pcfg);
+   gapc_panel_preferences_gsettings_add_monitor(pcfg);
 
    return;
 }
@@ -3580,15 +3629,14 @@ static PGAPC_PREFS_COLUMN gapc_panel_prefs_col_data_init(PGAPC_CONFIG pcfg,
    return pcol;
 }
 
-/*
- * Gets the GSettings preferences for all monitors
- * and loads the prefs_model.
- * returns FALSE on error
- * returns TRUE on success
-*/
-static gboolean gapc_panel_preferences_data_model_load(PGAPC_CONFIG pcfg)
+static void gapc_monitor_load(gchar *monitor_name, PGAPC_CONFIG pcfg)
 {
+   guint16 h_monitor = 0;
+   guint i_monitor;
    GtkTreeIter iter;
+   GSettings *monitor_settings = NULL;
+   gchar *monitor_settings_path;
+   gchar *v_host_name;
    gboolean v_enabled;
    gboolean v_use_systray;
    guint16 vh_port_number;
@@ -3597,90 +3645,95 @@ static gboolean gapc_panel_preferences_data_model_load(PGAPC_CONFIG pcfg)
    guint v_watt_number;
    gdouble v_network_interval;
    gdouble v_graph_interval;
-   gchar *v_host_name;
-   gchar ** monitor_names;
-   guint monitor_names_count;
-   gchar *monitor_settings_path;
-   guint16 h_monitor;
-   guint i_monitor;
+   GtkWidget *widget = NULL;
+
+   sscanf(monitor_name, GAPC_MONITOR_NAME_INPUT_FORMAT, &h_monitor);
+   i_monitor = (guint)h_monitor;
+
+   monitor_settings_path = g_strdup_printf(
+      GAPC_MONITOR_PATH_OUTPUT_FORMAT,
+      h_monitor);
+   monitor_settings = g_settings_new_with_path(GAPC_MONITOR_SCHEMA_ID, monitor_settings_path);
+   g_clear_pointer(&monitor_settings_path, g_free);
+
+   g_hash_table_insert(pcfg->pht_Monitor_Settings, g_strdup(monitor_name), monitor_settings);
+
+   v_enabled = g_settings_get_boolean(monitor_settings, GAPC_ENABLE_KEY);
+   v_use_systray = g_settings_get_boolean(monitor_settings, GAPC_SYSTRAY_KEY);
+   g_settings_get(monitor_settings, GAPC_PORT_KEY, "q", &vh_port_number);
+   v_port_number = (guint)vh_port_number;
+   if (v_port_number == 0) {
+      v_port_number = GAPC_PORT_DEFAULT;
+   }
+   g_settings_get(monitor_settings, GAPC_WATT_KEY, "q", &vh_watt_number);
+   v_watt_number = (guint)vh_watt_number;
+   if (v_watt_number == 0) {
+      v_watt_number = GAPC_WATT_DEFAULT;
+   }
+   v_network_interval =
+      g_settings_get_double(monitor_settings, GAPC_REFRESH_KEY);
+   if (v_network_interval == 0.0) {
+      v_network_interval = GAPC_REFRESH_DEFAULT;
+   }
+   v_graph_interval =
+      g_settings_get_double(monitor_settings, GAPC_GRAPH_KEY);
+   if (v_graph_interval == 0.0) {
+      v_graph_interval = GAPC_LINEGRAPH_REFRESH_FACTOR;
+   }
+   v_host_name = g_settings_get_string(monitor_settings, GAPC_HOST_KEY);
+
+   gtk_list_store_append(GTK_LIST_STORE(pcfg->prefs_model), &iter);
+   gtk_list_store_set(GTK_LIST_STORE(pcfg->prefs_model), &iter,
+      GAPC_PREFS_MONITOR, i_monitor,
+      GAPC_PREFS_ENABLED, v_enabled,
+      GAPC_PREFS_SYSTRAY, v_use_systray,
+      GAPC_PREFS_PORT, v_port_number,
+      GAPC_PREFS_REFRESH, v_network_interval,
+      GAPC_PREFS_GRAPH, v_graph_interval,
+      GAPC_PREFS_HOST, v_host_name,
+      GAPC_PREFS_WATT, v_watt_number,
+      -1);
+
+   g_clear_pointer(&v_host_name, g_free);
+
+   /* Startup Processing */
+   if (v_enabled) {
+      widget = gapc_monitor_interface_create(pcfg, i_monitor, &iter);
+      if ((widget != NULL) && !v_use_systray ) {
+           gtk_window_present( GTK_WINDOW(widget));
+      }
+   }
+}
+
+/*
+ * Gets the GSettings preferences for all monitors
+ * and loads the prefs_model.
+ * returns FALSE on error
+ * returns TRUE on success
+*/
+static gboolean gapc_panel_preferences_data_model_load(PGAPC_CONFIG pcfg)
+{
+   GQueue *monitor_names_queue = NULL;
 
    g_return_val_if_fail(pcfg != NULL, FALSE);
    g_return_val_if_fail(pcfg->app_settings != NULL, FALSE);
    g_return_val_if_fail(pcfg->prefs_model != NULL, FALSE);
-   g_return_val_if_fail(pcfg->prefs_model != NULL, FALSE);
 
-   monitor_names = g_settings_get_strv(pcfg->app_settings, GAPC_MONITOR_NAMES_KEY);
-   monitor_names_count = g_strv_length(monitor_names);
+   monitor_names_queue = gapc_create_monitor_names_queue(pcfg);
 
-   if (monitor_names_count == 0) {
+   if (g_queue_is_empty(monitor_names_queue)) {
       gapc_util_log_app_msg("gapc_panel_preferences_data_model_load",
          "No monitors predefined.", "very first startup");
-      g_clear_pointer(&monitor_names, g_strfreev);
+      g_queue_free_full(monitor_names_queue, g_free);
+      monitor_names_queue = NULL;
       return FALSE;
    }
-   for (guint i = 0; i != monitor_names_count; i++) {
-      GtkWidget *widget = NULL;
-      const gchar* monitor_name = monitor_names[i];
-      sscanf(monitor_name, GAPC_MONITOR_NAME_INPUT_FORMAT, &h_monitor);
-      if (h_monitor == 0) {
-         continue;
-      }
-      i_monitor = (guint)h_monitor;
-      pcfg->prefs_last_monitor = MAX(pcfg->prefs_last_monitor, i_monitor);
-
-      monitor_settings_path = g_strdup_printf(
-         GAPC_MONITOR_PATH_OUTPUT_FORMAT,
-         h_monitor);
-      GSettings *monitor_settings = g_settings_new_with_path(GAPC_MONITOR_SCHEMA_ID, monitor_settings_path);
-      g_clear_pointer(&monitor_settings_path, g_free);
-      g_hash_table_insert(pcfg->pht_Monitor_Settings, g_strdup(monitor_name), monitor_settings);
-      v_enabled = g_settings_get_boolean(monitor_settings, GAPC_ENABLE_KEY);
-      v_use_systray = g_settings_get_boolean(monitor_settings, GAPC_SYSTRAY_KEY);
-      g_settings_get(monitor_settings, GAPC_PORT_KEY, "q", &vh_port_number);
-      v_port_number = (guint)vh_port_number;
-      if (v_port_number == 0) {
-         v_port_number = GAPC_PORT_DEFAULT;
-      }
-      g_settings_get(monitor_settings, GAPC_WATT_KEY, "q", &vh_watt_number);
-      v_watt_number = (guint)vh_watt_number;
-      if (v_watt_number == 0) {
-         v_watt_number = GAPC_WATT_DEFAULT;
-      }
-      v_network_interval =
-         g_settings_get_double(monitor_settings, GAPC_REFRESH_KEY);
-      if (v_network_interval == 0.0) {
-         v_network_interval = GAPC_REFRESH_DEFAULT;
-      }
-      v_graph_interval =
-         g_settings_get_double(monitor_settings, GAPC_GRAPH_KEY);
-      if (v_graph_interval == 0.0) {
-         v_graph_interval = GAPC_LINEGRAPH_REFRESH_FACTOR;
-      }
-      v_host_name = g_settings_get_string(monitor_settings, GAPC_HOST_KEY);
-
-      gtk_list_store_append(GTK_LIST_STORE(pcfg->prefs_model), &iter);
-      gtk_list_store_set(GTK_LIST_STORE(pcfg->prefs_model), &iter,
-         GAPC_PREFS_MONITOR, i_monitor,
-         GAPC_PREFS_SYSTRAY, v_use_systray,
-         GAPC_PREFS_ENABLED, v_enabled,
-         GAPC_PREFS_PORT, v_port_number,
-         GAPC_PREFS_REFRESH, v_network_interval,
-         GAPC_PREFS_GRAPH, v_graph_interval,
-         GAPC_PREFS_HOST, v_host_name,
-         GAPC_PREFS_WATT, v_watt_number,
-         -1);
-
-      g_clear_pointer(&v_host_name, g_free);
-
-      /* Startup Processing */
-      if (v_enabled) {
-         widget = gapc_monitor_interface_create(pcfg, i_monitor, &iter);
-         if ((widget != NULL) && !v_use_systray ) {
-              gtk_window_present( GTK_WINDOW(widget));
-         }
-      }
-   }
-   g_clear_pointer(&monitor_names, g_strfreev);
+   g_queue_foreach(
+      monitor_names_queue,
+      (GFunc)gapc_monitor_load,
+      pcfg);
+   g_queue_free_full(monitor_names_queue, g_free);
+   monitor_names_queue = NULL;
    return TRUE;
 }
 
@@ -4495,6 +4548,7 @@ static void cb_panel_preferences_gsettings_changed(
    gchar *ov_s_host = NULL;
 
 
+   guint16 h_monitor = 0;
    guint i_monitor = 0;
    guint i_value = 0;
    guint16 h_value = 0;
@@ -4521,11 +4575,12 @@ static void cb_panel_preferences_gsettings_changed(
       &monitor_settings_path,
       NULL);
 
-   sscanf(monitor_settings_path, GAPC_MONITOR_PATH_INPUT_FORMAT, &i_monitor);
-   if (i_monitor == 0) {
+   if (sscanf(monitor_settings_path, GAPC_MONITOR_PATH_INPUT_FORMAT, &h_monitor) != 1 ||
+       h_monitor == 0) {
       return;
    }
    g_clear_pointer(&monitor_settings_path, g_free);
+   i_monitor = (guint)h_monitor;
 
    /* Determine control bools */
    b_ls_valid =
@@ -4684,7 +4739,8 @@ static void cb_panel_preferences_gsettings_changed(
 
    return;
 }
-static void signal_handler_monitor_settings_disconnect(
+
+static void gapc_signal_handler_monitor_settings_disconnect(
    gchar *key,
    GSettings *monitor_settings,
    PGAPC_CONFIG pcfg)
@@ -4712,7 +4768,7 @@ static gboolean gapc_panel_gsettings_destroy(PGAPC_CONFIG pcfg)
 
    g_hash_table_foreach(
       pcfg->pht_Monitor_Settings,
-      (GHFunc)signal_handler_monitor_settings_disconnect,
+      (GHFunc)gapc_signal_handler_monitor_settings_disconnect,
       pcfg);
 
    if (pcfg->pht_Monitor_Settings != NULL) {
@@ -4762,7 +4818,7 @@ static GVariant * color_setting_set(
    return variant;
 }
 
-static void signal_handler_monitor_settings_connect(
+static void gapc_signal_handler_monitor_settings_connect(
    gchar *key,
    GSettings *monitor_settings,
    PGAPC_CONFIG pcfg)
@@ -4888,7 +4944,7 @@ static gboolean gapc_panel_gsettings_watch(PGAPC_CONFIG pcfg)
 
    g_hash_table_foreach(
       pcfg->pht_Monitor_Settings,
-      (GHFunc)signal_handler_monitor_settings_connect,
+      (GHFunc)gapc_signal_handler_monitor_settings_connect,
       pcfg);
 
    return TRUE;
@@ -5704,7 +5760,7 @@ static gint gapc_panel_glossary_page(PGAPC_CONFIG pcfg, GtkWidget * notebook)
    return i_page;
 }
 
-static GtkWidget * new_color_button(GSettings * settings, gchar * key)
+static GtkWidget * gapc_color_button_new(GSettings * settings, gchar * key)
 {
    gchar * color_string;
    GdkColor color;
@@ -5777,7 +5833,7 @@ static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebo
       gtk_box_pack_start(GTK_BOX(pbox), label, FALSE, FALSE, 0);
       gtk_widget_show(label);
 
-      cb_linev = new_color_button(pcfg->controller_settings, GAPC_COLOR_LINEV_KEY);
+      cb_linev = gapc_color_button_new(pcfg->controller_settings, GAPC_COLOR_LINEV_KEY);
       gtk_color_button_set_title (GTK_COLOR_BUTTON(cb_linev), "LINEV");
       gtk_box_pack_start(GTK_BOX(pbox), cb_linev, FALSE, FALSE, 0);
       gtk_widget_show(cb_linev);
@@ -5789,7 +5845,7 @@ static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebo
       gtk_box_pack_start(GTK_BOX(pbox), label, FALSE, FALSE, 0);
       gtk_widget_show(label);
 
-      cb_loadpct = new_color_button(pcfg->controller_settings, GAPC_COLOR_LOADPCT_KEY);
+      cb_loadpct = gapc_color_button_new(pcfg->controller_settings, GAPC_COLOR_LOADPCT_KEY);
       gtk_color_button_set_title (GTK_COLOR_BUTTON(cb_loadpct), "LOADPCT");
       gtk_box_pack_start(GTK_BOX(pbox), cb_loadpct, FALSE, FALSE, 0);
       gtk_widget_show(cb_loadpct);
@@ -5801,7 +5857,7 @@ static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebo
       gtk_box_pack_start(GTK_BOX(pbox), label, FALSE, FALSE, 0);
       gtk_widget_show(label);
 
-      cb_timeleft = new_color_button(pcfg->controller_settings, GAPC_COLOR_TIMELEFT_KEY);
+      cb_timeleft = gapc_color_button_new(pcfg->controller_settings, GAPC_COLOR_TIMELEFT_KEY);
       gtk_color_button_set_title (GTK_COLOR_BUTTON(cb_timeleft), "TIMELEFT");
       gtk_box_pack_start(GTK_BOX(pbox), cb_timeleft, FALSE, FALSE, 0);
       gtk_widget_show(cb_timeleft);
@@ -5813,7 +5869,7 @@ static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebo
       gtk_box_pack_start(GTK_BOX(pbox), label, FALSE, FALSE, 0);
       gtk_widget_show(label);
 
-      cb_bcharge = new_color_button(pcfg->controller_settings, GAPC_COLOR_BCHARGE_KEY);
+      cb_bcharge = gapc_color_button_new(pcfg->controller_settings, GAPC_COLOR_BCHARGE_KEY);
       gtk_color_button_set_title (GTK_COLOR_BUTTON(cb_bcharge), "BCHARGE");
       gtk_box_pack_start(GTK_BOX(pbox), cb_bcharge, FALSE, FALSE, 0);
       gtk_widget_show(cb_bcharge);
@@ -5825,7 +5881,7 @@ static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebo
       gtk_box_pack_start(GTK_BOX(pbox), label, FALSE, FALSE, 0);
       gtk_widget_show(label);
 
-      cb_battv = new_color_button(pcfg->controller_settings, GAPC_COLOR_BATTV_KEY);
+      cb_battv = gapc_color_button_new(pcfg->controller_settings, GAPC_COLOR_BATTV_KEY);
       gtk_color_button_set_title (GTK_COLOR_BUTTON(cb_battv), "BATTV");
       gtk_box_pack_start(GTK_BOX(pbox), cb_battv, FALSE, FALSE, 0);
       gtk_widget_show(cb_battv);
@@ -5847,7 +5903,7 @@ static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebo
       gtk_box_pack_start(GTK_BOX(pbox), label, FALSE, FALSE, 0);
       gtk_widget_show(label);
 
-      cb_window = new_color_button(pcfg->controller_settings, GAPC_COLOR_WINDOW_KEY);
+      cb_window = gapc_color_button_new(pcfg->controller_settings, GAPC_COLOR_WINDOW_KEY);
       gtk_color_button_set_title (GTK_COLOR_BUTTON(cb_window), "Window Background");
       gtk_box_pack_start(GTK_BOX(pbox), cb_window, FALSE, FALSE, 0);
       gtk_widget_show(cb_window);
@@ -5859,7 +5915,7 @@ static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebo
       gtk_box_pack_start(GTK_BOX(pbox), label, FALSE, FALSE, 0);
       gtk_widget_show(label);
 
-      cb_chart = new_color_button(pcfg->controller_settings, GAPC_COLOR_CHART_KEY);
+      cb_chart = gapc_color_button_new(pcfg->controller_settings, GAPC_COLOR_CHART_KEY);
       gtk_color_button_set_title (GTK_COLOR_BUTTON(cb_chart), "Chart Background");
       gtk_box_pack_start(GTK_BOX(pbox), cb_chart, FALSE, FALSE, 0);
       gtk_widget_show(cb_chart);
@@ -5871,7 +5927,7 @@ static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebo
       gtk_box_pack_start(GTK_BOX(pbox), label, FALSE, FALSE, 0);
       gtk_widget_show(label);
 
-      cb_text = new_color_button(pcfg->controller_settings, GAPC_COLOR_TITLE_KEY);
+      cb_text = gapc_color_button_new(pcfg->controller_settings, GAPC_COLOR_TITLE_KEY);
       gtk_color_button_set_title (GTK_COLOR_BUTTON(cb_text), "Title Texts");
       gtk_box_pack_start(GTK_BOX(pbox), cb_text, FALSE, FALSE, 0);
       gtk_widget_show(cb_text);
