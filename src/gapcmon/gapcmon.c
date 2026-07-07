@@ -165,6 +165,14 @@ static void cb_panel_monitor_list_activated(GtkTreeView * treeview,
    GtkTreePath * arg1, GtkTreeViewColumn * arg2, PGAPC_CONFIG pcfg);
 static gint gapc_panel_glossary_page(PGAPC_CONFIG pcfg, GtkWidget * notebook);
 static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebook);
+static void gapc_signal_handler_monitor_settings_disconnect(
+   gchar *key,
+   GSettings *monitor_settings,
+   PGAPC_CONFIG pcfg);
+static void cb_panel_preferences_gsettings_changed(
+   GSettings *monitor_settings,
+   gchar *key,
+   PGAPC_CONFIG pcfg);
 
 /*
  * Common interface to the various versions of gethostbyname_r().
@@ -3058,86 +3066,66 @@ static gint gapc_panel_monitor_model_rec_add(PGAPC_CONFIG pcfg, PGAPC_MONITOR pm
    return TRUE;
 }
 
-static gint gapc_panel_preferences_model_rec_remove(PGAPC_CONFIG pcfg)
+static gboolean gapc_panel_preferences_gsettings_remove_monitor(PGAPC_CONFIG pcfg)
 {
-   GtkTreeIter iter, *piter = NULL;
-   gboolean result = FALSE;
+   GStrvBuilder *builder = NULL;
+   GtkTreeIter iter;
    guint i_monitor = 0;
-   gchar ch[GAPC_MAX_TEXT];
-   gchar chk[GAPC_MAX_TEXT];
-   GError *gerror = NULL;
+   guint16 h_monitor = 0;
+   GList *link = NULL;
+   gchar * monitor_name = NULL;
+   gchar **monitor_names = NULL;
+   GQueue *monitor_names_queue = NULL;
+   GSettings *monitor_settings = NULL;
 
-   g_return_val_if_fail(pcfg != NULL, -1);
-   g_return_val_if_fail(pcfg->prefs_model != NULL, -1);
+   g_return_val_if_fail(pcfg != NULL, FALSE);
+   g_return_val_if_fail(pcfg->app_settings != NULL, FALSE);
+   g_return_val_if_fail(pcfg->prefs_model != NULL, FALSE);
+   g_return_val_if_fail(pcfg->prefs_select != NULL, FALSE);
+   g_return_val_if_fail(pcfg->pht_Monitor_Settings != NULL, FALSE);
 
    if (gtk_tree_selection_get_selected(pcfg->prefs_select, NULL, &iter)) {
-      piter = gtk_tree_iter_copy(&iter);
-      if (gtk_tree_model_iter_next(GTK_TREE_MODEL(pcfg->prefs_model), piter)) {
-         gtk_tree_selection_select_iter(pcfg->prefs_select, piter);
-      }
-      gtk_tree_iter_free(piter);
       gtk_tree_model_get(GTK_TREE_MODEL(pcfg->prefs_model), &iter,
          GAPC_PREFS_MONITOR, &i_monitor, -1);
-
-      /* now remove the record from gconf */ // FIXME
-      // XXX g_snprintf(ch, GAPC_MAX_TEXT, "%s/%d", GAPC_MID_GROUP_KEY, i_monitor);
-
-      // XXX gconf_client_unset(pcfg->client, ch, &gerror);
-      if (gerror != NULL) {
-         gapc_util_log_app_msg("gapc_panel_preferences_model_rec_remove()",
-            "gconf_client_unset(DIR) Failed", gerror->message); // FIXME MESSAGE
-         g_error_free(gerror);
-         gerror = NULL;
+      h_monitor = (guint16)i_monitor;
+      monitor_name = g_strdup_printf(GAPC_MONITOR_NAME_OUTPUT_FORMAT, h_monitor);
+      monitor_settings = g_hash_table_lookup(
+         pcfg->pht_Monitor_Settings,
+         monitor_name);
+      monitor_names_queue = gapc_create_monitor_names_queue(pcfg);
+      if (!g_queue_is_empty(monitor_names_queue)) {
+         link = g_queue_find_custom(
+            monitor_names_queue,
+            monitor_name,
+            (GCompareFunc)gapc_monitor_names_compare);
+         if (link != NULL) {
+            g_queue_delete_link(monitor_names_queue, link);
+            link = NULL;
+         }
+         g_clear_pointer(&monitor_name, g_free);
       }
-
-      // XXX gconf_client_suggest_sync(pcfg->client, &gerror);
-      if (gerror != NULL) {
-         gapc_util_log_app_msg("gapc_panel_preferences_model_rec_remove()",
-            "gconf_client_suggest_sync() Failed", gerror->message); // FIXME MESSAGE
-         g_error_free(gerror);
-         gerror = NULL;
+      if (g_queue_is_empty(monitor_names_queue)) {
+         g_queue_free(monitor_names_queue);
+         monitor_names_queue = NULL;
+         g_settings_reset(pcfg->app_settings, GAPC_MONITOR_NAMES_KEY);
+      } else {
+         builder = g_strv_builder_new();
+         g_queue_foreach(
+            monitor_names_queue,
+            (GFunc)gapc_strv_builder_add_string,
+            builder);
+         g_queue_free_full(monitor_names_queue, g_free);
+         monitor_names_queue = NULL;
+         monitor_names = g_strv_builder_unref_to_strv(builder);
+         g_settings_set_strv(
+            pcfg->app_settings,
+            GAPC_MONITOR_NAMES_KEY,
+            (const gchar * const *)monitor_names);
+         g_clear_pointer(&monitor_names, g_strfreev);
       }
-
-      g_snprintf(chk, GAPC_MAX_TEXT, "%s/%s", ch, "enabled");
-      // XXX gconf_client_unset(pcfg->client, chk, NULL);
-
-      g_snprintf(chk, GAPC_MAX_TEXT, "%s/%s", ch, "use_systray");
-      // XXX gconf_client_unset(pcfg->client, chk, NULL);
-
-      g_snprintf(chk, GAPC_MAX_TEXT, "%s/%s", ch, "skip_pagers");
-      // XXX gconf_client_unset(pcfg->client, chk, NULL);
-
-      g_snprintf(chk, GAPC_MAX_TEXT, "%s/%s", ch, "port_number");
-      // XXX gconf_client_unset(pcfg->client, chk, NULL);
-
-      g_snprintf(chk, GAPC_MAX_TEXT, "%s/%s", ch, "network_interval");
-      // XXX gconf_client_unset(pcfg->client, chk, NULL);
-
-      g_snprintf(chk, GAPC_MAX_TEXT, "%s/%s", ch, "graph_interval");
-      // XXX gconf_client_unset(pcfg->client, chk, NULL);
-
-      g_snprintf(chk, GAPC_MAX_TEXT, "%s/%s", ch, "host_name");
-      // XXX gconf_client_unset(pcfg->client, chk, NULL);
-
-      // XXX gconf_client_unset(pcfg->client, ch, &gerror);    /* again to drop it in gconf */ // FIXME COMMENT
-      if (gerror != NULL) {
-         gapc_util_log_app_msg("gapc_panel_preferences_model_rec_remove()",
-            "gconf_client_unset(DIR) Failed", gerror->message); // FIXME MESSAGE
-         g_error_free(gerror);
-         gerror = NULL;
-      }
-
-      // XXX gconf_client_suggest_sync(pcfg->client, &gerror);
-      if (gerror != NULL) {
-         gapc_util_log_app_msg("gapc_panel_preferences_model_rec_remove()",
-            "gconf_client_suggest_sync() Failed", gerror->message); // FIXME MESSAGE
-         g_error_free(gerror);
-         gerror = NULL;
-      }
-
+      g_settings_sync();
    }
-
-   return result;
+   return TRUE;
 }
 
 /*
@@ -3411,8 +3399,12 @@ static void cb_panel_prefs_button_add_rec(GtkWidget * button, PGAPC_CONFIG pcfg)
 static void cb_panel_prefs_button_remove_rec(GtkWidget * button, PGAPC_CONFIG pcfg)
 {
    g_return_if_fail(pcfg != NULL);
+   g_return_if_fail(pcfg->app_settings != NULL);
+   g_return_if_fail(pcfg->prefs_model != NULL);
+   g_return_if_fail(pcfg->prefs_select != NULL);
+   g_return_if_fail(pcfg->pht_Monitor_Settings != NULL);
 
-   gapc_panel_preferences_model_rec_remove(pcfg);
+   gapc_panel_preferences_gsettings_remove_monitor(pcfg);
 
    return;
 }
