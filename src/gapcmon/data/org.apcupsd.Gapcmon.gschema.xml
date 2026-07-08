@@ -1,66 +1,88 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
-  <schema id="org.apcupsd.Gapcmon" path="/org/apcupsd/gapcmon/">
-    <child name="controller" schema="org.apcupsd.Gapcmon.controller"/>
-    <child name="monitors" schema="org.apcupsd.Gapcmon.monitors"/>
-    <key name="monitor-names" type="as">
-      <default>[]</default>
-    </key>
-  </schema>
 
   <schema id="org.apcupsd.Gapcmon.controller" path="/org/apcupsd/gapcmon/controller/">
     <key name="color-battv" type="s">
       <default>'#000000'</default>
+      <summary>Color of the BATTV data series on the Historical Summary graph</summary>
     </key>
     <key name="color-bcharge" type="s">
       <default>'#ffff00'</default>
+      <summary>Color of the BCHARGE data series on the Historical Summary graph</summary>
     </key>
     <key name="color-chart" type="s">
       <default>'#add8e6'</default>
+      <summary>Background color of charts</summary>
     </key>
     <key name="color-linev" type="s">
       <default>'#008000'</default>
+      <summary>Color of the LINEV data series on the Historical Summary graph</summary>
     </key>
     <key name="color-loadpct" type="s">
       <default>'#0000ff'</default>
+      <summary>Color of the LOADPCT data series on the Historical Summary graph</summary>
     </key>
     <key name="color-timeleft" type="s">
       <default>'#ff0000'</default>
+      <summary>Color of the TIMELEFT data series on the Historical Summary graph</summary>
     </key>
     <key name="color-title" type="s">
       <default>'#0000ff'</default>
+      <summary>Text color of titles</summary>
     </key>
     <key name="color-window" type="s">
       <default>'#ffffff'</default>
+      <summary>Background color of windows</summary>
     </key>
     <key name="use-systray" type="b">
       <default>false</default>
+      <summary>Add an icon for the control panel to the systray</summary>
     </key>
   </schema>
 
   <schema id="org.apcupsd.Gapcmon.monitor">
-    <key name="enabled" type="b">
+    <key name="enable-monitor" type="b">
       <default>false</default>
+      <summary>Enable this monitor</summary>
     </key>
     <key name="graph-interval" type="d">
-      <default>30</default>
+      <default>30.0</default>
+      <summary>A multiplier, of the network interval, that controls the number of seconds between graph updates</summary>
+      <range min="1.0"/>
     </key>
     <key name="host-name" type="s">
       <default>'localhost'</default>
+      <summary>The name of a host where apcupsd is running</summary>
     </key>
     <key name="network-interval" type="d">
-      <default>8</default>
+      <default>8.0</default>
+      <summary>The number of seconds between collections of status and event data from the network</summary>
+      <range min="1.0"/>
     </key>
-    <key name="port-number" type="q">
+    <key name="port-number" type="u">
       <default>3551</default>
+      <summary>The apcupsd information port number</summary>
+      <range min="1" max="65535"/>
     </key>
-    <key name="ups-wattage" type="q">
+    <key name="ups-wattage" type="u">
       <default>600</default>
+      <summary>The wattage rating of a UPS</summary>
+      <range min="1"/>
     </key>
     <key name="use-systray" type="b">
       <default>false</default>
+      <summary>Add an icon for this monitor to the systray</summary>
     </key>
   </schema>
 
   <schema id="org.apcupsd.Gapcmon.monitors" path="/org/apcupsd/gapcmon/monitors:/" list-of="org.apcupsd.Gapcmon.monitor"/>
+
+  <schema id="org.apcupsd.Gapcmon" path="/org/apcupsd/gapcmon/">
+    <child name="controller" schema="org.apcupsd.Gapcmon.controller"/>
+    <key name="monitor-names" type="as">
+      <default>[]</default>
+      <summary>Names of the monitors</summary>
+    </key>
+  </schema>
+
 </schemalist>

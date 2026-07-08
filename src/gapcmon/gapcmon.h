@@ -45,8 +45,8 @@ G_BEGIN_DECLS
 #define GAPC_CONTROLLER_SCHEMA_ID "org.apcupsd.Gapcmon.controller"
 #define GAPC_MONITOR_SCHEMA_ID    "org.apcupsd.Gapcmon.monitor"
 
-#define GAPC_MONITOR_NAME_INPUT_FORMAT  "%4hx"
-#define GAPC_MONITOR_NAME_OUTPUT_FORMAT "%04hx"
+#define GAPC_MONITOR_NAME_INPUT_FORMAT  "%4x"
+#define GAPC_MONITOR_NAME_OUTPUT_FORMAT "%04x"
 #define GAPC_MONITOR_PATH_INPUT_FORMAT  "/org/apcupsd/gapcmon/monitors:/" GAPC_MONITOR_NAME_INPUT_FORMAT "/"
 #define GAPC_MONITOR_PATH_OUTPUT_FORMAT "/org/apcupsd/gapcmon/monitors:/" GAPC_MONITOR_NAME_OUTPUT_FORMAT "/"
 
@@ -63,7 +63,7 @@ G_BEGIN_DECLS
 
 #define GAPC_SYSTRAY_KEY        "use-systray"
 
-#define GAPC_ENABLE_KEY         "enabled"
+#define GAPC_ENABLE_KEY         "enable-monitor"
 #define GAPC_PORT_KEY           "port-number"
 #define GAPC_REFRESH_KEY        "network-interval"
 #define GAPC_GRAPH_KEY          "graph-interval"
@@ -73,19 +73,14 @@ G_BEGIN_DECLS
 #define GAPC_MAX_ARRAY 256         /* for arrays or lists */
 #define GAPC_MAX_TEXT 256          /* for strings */
 #define GAPC_ICON_SIZE 24          /* Ideal size of icons */
-#define GAPC_MAX_BUFFER  512      /* Size of a text buffer or local string */
+#define GAPC_MAX_BUFFER  512       /* Size of a text buffer or local string */
 
 #define GAPC_REFRESH_FACTOR_1K 1000     /* micro.secs for visual refresh    */
 #define GAPC_REFRESH_FACTOR_ONE_TIME 500
-#define GAPC_HOST_DEFAULT "localhost"
-#define GAPC_PORT_DEFAULT 3551
-#define GAPC_WATT_DEFAULT 600
-#define GAPC_REFRESH_DEFAULT 8.0
 #define GAPC_REFRESH_MIN_INCREMENT 1.0  /* Minimum refresh cycle seconds */
 #define GAPC_LINEGRAPH_XMAX 40
 #define GAPC_LINEGRAPH_YMAX 110
 #define GAPC_LINEGRAPH_MAX_SERIES 5
-#define GAPC_LINEGRAPH_REFRESH_FACTOR 30.0      /* Num refreshes per collection  */
 
 #define SKNET_HUGE_ARRAY 4096
 #define SKNET_REG_ARRAY  1024
