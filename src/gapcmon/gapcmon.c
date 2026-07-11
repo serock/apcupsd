@@ -173,6 +173,9 @@ static void cb_panel_monitor_list_activated(GtkTreeView * treeview,
    GtkTreePath * arg1, GtkTreeViewColumn * arg2, PGAPC_CONFIG pcfg);
 static gint gapc_panel_glossary_page(PGAPC_CONFIG pcfg, GtkWidget * notebook);
 static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebook);
+static void gapc_signal_handler_monitor_settings_connect(
+   GSettings *monitor_settings,
+   PGAPC_CONFIG pcfg);
 static void gapc_signal_handler_monitor_settings_disconnect(
    gchar *key,
    GSettings *monitor_settings,
@@ -2780,7 +2783,7 @@ static void gapc_strv_builder_add_string(
     g_strv_builder_add(builder, str);
 }
 
-static GQueue *gapc_create_monitor_names_queue(PGAPC_CONFIG pcfg)
+static GQueue *gapc_monitor_names_queue_new(PGAPC_CONFIG pcfg)
 {
    guint i_monitor = 0;
    guint i_prev_monitor = 0;
@@ -2829,7 +2832,7 @@ static gboolean gapc_panel_preferences_gsettings_add_monitor(PGAPC_CONFIG pcfg)
    g_return_val_if_fail(pcfg->app_settings != NULL, FALSE);
    g_return_val_if_fail(pcfg->prefs_model != NULL, FALSE);
 
-   monitor_names_queue = gapc_create_monitor_names_queue(pcfg);
+   monitor_names_queue = gapc_monitor_names_queue_new(pcfg);
    if (!g_queue_is_empty(monitor_names_queue)) {
       tail = g_queue_peek_tail(monitor_names_queue);
       sscanf(tail, GAPC_MONITOR_NAME_INPUT_FORMAT, &i_monitor);
@@ -3064,10 +3067,14 @@ static gint gapc_panel_monitor_model_rec_add(PGAPC_CONFIG pcfg, PGAPC_MONITOR pm
       pch = "Starting";
    }
 
-   gtk_list_store_set(GTK_LIST_STORE(pcfg->monitor_model), &iter, GAPC_MON_ICON,
-      pm->my_icons[pm->i_icon_index], GAPC_MON_STATUS,
-      pm->ch_title_info, GAPC_MON_MONITOR, pm->cb_monitor_num,
-      GAPC_MON_POINTER, (gpointer) pm, GAPC_MON_UPSSTATE, pch, -1);
+   gtk_list_store_set(
+      GTK_LIST_STORE(pcfg->monitor_model),
+      &iter,
+      GAPC_MON_ICON, pm->my_icons[pm->i_icon_index],
+      GAPC_MON_STATUS, pm->ch_title_info,
+      GAPC_MON_MONITOR, pm->cb_monitor_num,
+      GAPC_MON_POINTER, (gpointer) pm,
+      GAPC_MON_UPSSTATE, pch, -1);
 
    gtk_tree_selection_select_iter(pcfg->monitor_select, &iter);
 
@@ -3098,21 +3105,20 @@ static gboolean gapc_panel_preferences_gsettings_remove_monitor(PGAPC_CONFIG pcf
       monitor_settings = g_hash_table_lookup(
          pcfg->pht_Monitor_Settings,
          monitor_name);
-      monitor_names_queue = gapc_create_monitor_names_queue(pcfg);
+      monitor_names_queue = gapc_monitor_names_queue_new(pcfg);
       if (!g_queue_is_empty(monitor_names_queue)) {
          link = g_queue_find_custom(
             monitor_names_queue,
             monitor_name,
             (GCompareFunc)gapc_monitor_names_compare);
          if (link != NULL) {
+            g_free(link->data);
             g_queue_delete_link(monitor_names_queue, link);
             link = NULL;
          }
          g_clear_pointer(&monitor_name, g_free);
       }
       if (g_queue_is_empty(monitor_names_queue)) {
-         g_queue_free(monitor_names_queue);
-         monitor_names_queue = NULL;
          g_settings_reset(pcfg->app_settings, GAPC_MONITOR_NAMES_KEY);
       } else {
          builder = g_strv_builder_new();
@@ -3120,8 +3126,6 @@ static gboolean gapc_panel_preferences_gsettings_remove_monitor(PGAPC_CONFIG pcf
             monitor_names_queue,
             (GFunc)gapc_strv_builder_add_string,
             builder);
-         g_queue_free_full(monitor_names_queue, g_free);
-         monitor_names_queue = NULL;
          monitor_names = g_strv_builder_unref_to_strv(builder);
          g_settings_set_strv(
             pcfg->app_settings,
@@ -3130,6 +3134,8 @@ static gboolean gapc_panel_preferences_gsettings_remove_monitor(PGAPC_CONFIG pcf
          g_clear_pointer(&monitor_names, g_strfreev);
       }
       g_settings_sync();
+      g_queue_free_full(monitor_names_queue, g_free);
+      monitor_names_queue = NULL;
    }
    return TRUE;
 }
@@ -3684,6 +3690,7 @@ static void gapc_monitor_load(gchar *monitor_name, PGAPC_CONFIG pcfg)
            gtk_window_present( GTK_WINDOW(widget));
       }
    }
+   gapc_signal_handler_monitor_settings_connect(monitor_settings, pcfg);
 }
 
 /*
@@ -3700,7 +3707,7 @@ static gboolean gapc_panel_preferences_data_model_load(PGAPC_CONFIG pcfg)
    g_return_val_if_fail(pcfg->app_settings != NULL, FALSE);
    g_return_val_if_fail(pcfg->prefs_model != NULL, FALSE);
 
-   monitor_names_queue = gapc_create_monitor_names_queue(pcfg);
+   monitor_names_queue = gapc_monitor_names_queue_new(pcfg);
 
    if (g_queue_is_empty(monitor_names_queue)) {
       gapc_util_log_app_msg("gapc_panel_preferences_data_model_load",
@@ -4491,7 +4498,7 @@ static void cb_main_interface_button_quit(GtkWidget * button, PGAPC_CONFIG pcfg)
    return;
 }
 
-static void controller_use_systray_changed(
+static void gapc_controller_settings_use_systray_changed(
    GSettings * settings,
    gchar * key,
    PGAPC_CONFIG pcfg)
@@ -4506,7 +4513,97 @@ static void controller_use_systray_changed(
       }
    }
 }
-// XXX TODO NEED ROUTINE TO HANDLE CHANGES TO APP SETTINGS
+
+static gboolean gapc_monitor_is_enabled(PGAPC_CONFIG pcfg, guint i_monitor)
+{
+   gboolean enabled;
+   gboolean valid;
+   GtkTreeIter iter;
+   guint monitor;
+
+   valid = gtk_tree_model_get_iter_first(pcfg->prefs_model, &iter);
+   while (valid) {
+      gtk_tree_model_get(
+         pcfg->prefs_model,
+         &iter,
+         GAPC_PREFS_MONITOR, &monitor,
+         GAPC_PREFS_ENABLED, &enabled, -1);
+      if (i_monitor == monitor) {
+         break;
+      }
+      valid = gtk_tree_model_iter_next(pcfg->prefs_model, &iter);
+   }
+   return enabled;
+}
+
+static void gapc_app_settings_monitor_names_changed(
+   GSettings *app_settings,
+   gchar *key,
+   PGAPC_CONFIG pcfg)
+{
+   guint i_monitor = 0;
+   guint i_monitor_selected = 0;
+   GtkTreeIter iter;
+   GtkTreeIter iter_next;
+   gchar **keys = NULL;
+   guint keys_count = 0;
+   gchar *monitor_name = NULL;
+   gchar **monitor_names = NULL;
+   guint monitor_names_count = 0;
+   GSettings *monitor_settings = NULL;
+
+   monitor_names = g_settings_get_strv(pcfg->app_settings, GAPC_MONITOR_NAMES_KEY);
+   monitor_names_count = g_strv_length(monitor_names);
+
+   for (int i = 0; i < monitor_names_count; i++) {
+      monitor_name = monitor_names[i];
+      if (!g_hash_table_contains(pcfg->pht_Monitor_Settings, monitor_name)) {
+         gapc_monitor_load(monitor_name, pcfg);
+      }
+   }
+   keys = (gchar **)g_hash_table_get_keys_as_array(pcfg->pht_Monitor_Settings, &keys_count);
+   for (int i = 0; i < keys_count; i++) {
+      monitor_name = keys[i];
+      if (!g_strv_contains((const gchar* const*)monitor_names, monitor_name)) {
+         monitor_settings = g_hash_table_lookup(pcfg->pht_Monitor_Settings, monitor_name);
+         gapc_signal_handler_monitor_settings_disconnect(
+            NULL,
+            monitor_settings,
+            pcfg);
+         g_settings_reset(monitor_settings, GAPC_ENABLE_KEY);
+         g_settings_reset(monitor_settings, GAPC_SYSTRAY_KEY);
+         g_settings_reset(monitor_settings, GAPC_PORT_KEY);
+         g_settings_reset(monitor_settings, GAPC_REFRESH_KEY);
+         g_settings_reset(monitor_settings, GAPC_GRAPH_KEY);
+         g_settings_reset(monitor_settings, GAPC_HOST_KEY);
+         g_settings_reset(monitor_settings, GAPC_WATT_KEY);
+         g_settings_sync();
+
+         sscanf(monitor_name, GAPC_MONITOR_NAME_INPUT_FORMAT, &i_monitor);
+
+         if (gtk_tree_selection_get_selected(pcfg->prefs_select, NULL, &iter)) {
+            gtk_tree_model_get(
+               GTK_TREE_MODEL(pcfg->prefs_model),
+               &iter,
+               GAPC_PREFS_MONITOR, &i_monitor_selected, -1);
+            if (i_monitor == i_monitor_selected) {
+               iter_next = iter;
+               if (gtk_tree_model_iter_next(GTK_TREE_MODEL(pcfg->prefs_model), &iter_next)) {
+                  gtk_tree_selection_select_iter(pcfg->prefs_select, &iter_next);
+               }
+            }
+         }
+         if (gapc_monitor_is_enabled(pcfg, i_monitor)) {
+            gapc_monitor_interface_destroy(pcfg, i_monitor);
+         }
+         g_hash_table_remove(pcfg->pht_Monitor_Settings, monitor_name);
+         gtk_list_store_remove(GTK_LIST_STORE(pcfg->prefs_model), &iter);
+      }
+   }
+   g_clear_pointer(&keys, g_free);
+   g_clear_pointer(&monitor_names, g_strfreev);
+}
+
 /*
  * GSettings routine
  * Handles changes to prefs_model, or the master list of monitors in the preferences page.
@@ -4572,8 +4669,6 @@ static void cb_panel_preferences_gsettings_changed(
          i_monitor);
       if (b_active_valid) {
          gtk_tree_model_get(pcfg->monitor_model, &miter, GAPC_MON_POINTER, &pm, -1);
-      } else {
-         b_active_valid = FALSE;
       }
 
       if ((pm == NULL) || (pm->window == NULL)) {
@@ -4756,7 +4851,7 @@ static gboolean gapc_panel_gsettings_destroy(PGAPC_CONFIG pcfg)
    }
    number_of_handlers = g_signal_handlers_disconnect_by_func(
       pcfg->controller_settings,
-      G_CALLBACK(controller_use_systray_changed),
+      G_CALLBACK(gapc_controller_settings_use_systray_changed),
       pcfg);
 
    g_clear_object(&pcfg->controller_settings);
@@ -4765,7 +4860,7 @@ static gboolean gapc_panel_gsettings_destroy(PGAPC_CONFIG pcfg)
    return TRUE;
 }
 
-static gboolean color_property_value_get(
+static gboolean gapc_color_property_value_get(
    GValue *color_property_value,
    GVariant *color_setting,
    gpointer user_data) {
@@ -4783,7 +4878,7 @@ static gboolean color_property_value_get(
    return FALSE;
 }
 
-static GVariant * color_setting_set(
+static GVariant * gapc_color_setting_set(
    const GValue *color_property_value,
    const GVariantType *expected_type,
    gpointer user_data)
@@ -4798,7 +4893,6 @@ static GVariant * color_setting_set(
 }
 
 static void gapc_signal_handler_monitor_settings_connect(
-   gchar *key,
    GSettings *monitor_settings,
    PGAPC_CONFIG pcfg)
 {
@@ -4812,18 +4906,24 @@ static void gapc_signal_handler_monitor_settings_connect(
 }
 
 /*
- * Set up the GSettings signals and bindings for the control panel
+ * Set up the app and controller GSettings signals and bindings
  * returns FALSE on error
  * returns TRUE on success
 */
-static gboolean gapc_panel_gsettings_watch(PGAPC_CONFIG pcfg)
+static gboolean gapc_gsettings_watch(PGAPC_CONFIG pcfg)
 {
    g_return_val_if_fail(pcfg != NULL, FALSE);
 
    g_signal_connect(
+      pcfg->app_settings,
+      "changed::" GAPC_MONITOR_NAMES_KEY,
+      G_CALLBACK(gapc_app_settings_monitor_names_changed),
+      pcfg);
+
+   g_signal_connect(
       pcfg->controller_settings,
       "changed::" GAPC_SYSTRAY_KEY,
-      G_CALLBACK(controller_use_systray_changed),
+      G_CALLBACK(gapc_controller_settings_use_systray_changed),
       pcfg);
 
    g_settings_bind(
@@ -4839,8 +4939,8 @@ static gboolean gapc_panel_gsettings_watch(PGAPC_CONFIG pcfg)
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_LINEV_KEY),
       "color",
       G_SETTINGS_BIND_DEFAULT,
-      color_property_value_get,
-      color_setting_set,
+      gapc_color_property_value_get,
+      gapc_color_setting_set,
       NULL,
       NULL);
 
@@ -4850,8 +4950,8 @@ static gboolean gapc_panel_gsettings_watch(PGAPC_CONFIG pcfg)
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_LOADPCT_KEY),
       "color",
       G_SETTINGS_BIND_DEFAULT,
-      color_property_value_get,
-      color_setting_set,
+      gapc_color_property_value_get,
+      gapc_color_setting_set,
       NULL,
       NULL);
 
@@ -4861,8 +4961,8 @@ static gboolean gapc_panel_gsettings_watch(PGAPC_CONFIG pcfg)
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_TIMELEFT_KEY),
       "color",
       G_SETTINGS_BIND_DEFAULT,
-      color_property_value_get,
-      color_setting_set,
+      gapc_color_property_value_get,
+      gapc_color_setting_set,
       NULL,
       NULL);
 
@@ -4872,8 +4972,8 @@ static gboolean gapc_panel_gsettings_watch(PGAPC_CONFIG pcfg)
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_BCHARGE_KEY),
       "color",
       G_SETTINGS_BIND_DEFAULT,
-      color_property_value_get,
-      color_setting_set,
+      gapc_color_property_value_get,
+      gapc_color_setting_set,
       NULL,
       NULL);
 
@@ -4883,8 +4983,8 @@ static gboolean gapc_panel_gsettings_watch(PGAPC_CONFIG pcfg)
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_BATTV_KEY),
       "color",
       G_SETTINGS_BIND_DEFAULT,
-      color_property_value_get,
-      color_setting_set,
+      gapc_color_property_value_get,
+      gapc_color_setting_set,
       NULL,
       NULL);
 
@@ -4894,8 +4994,8 @@ static gboolean gapc_panel_gsettings_watch(PGAPC_CONFIG pcfg)
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_WINDOW_KEY),
       "color",
       G_SETTINGS_BIND_DEFAULT,
-      color_property_value_get,
-      color_setting_set,
+      gapc_color_property_value_get,
+      gapc_color_setting_set,
       NULL,
       NULL);
 
@@ -4905,8 +5005,8 @@ static gboolean gapc_panel_gsettings_watch(PGAPC_CONFIG pcfg)
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_CHART_KEY),
       "color",
       G_SETTINGS_BIND_DEFAULT,
-      color_property_value_get,
-      color_setting_set,
+      gapc_color_property_value_get,
+      gapc_color_setting_set,
       NULL,
       NULL);
 
@@ -4916,15 +5016,10 @@ static gboolean gapc_panel_gsettings_watch(PGAPC_CONFIG pcfg)
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_TITLE_KEY),
       "color",
       G_SETTINGS_BIND_DEFAULT,
-      color_property_value_get,
-      color_setting_set,
+      gapc_color_property_value_get,
+      gapc_color_setting_set,
       NULL,
       NULL);
-
-   g_hash_table_foreach(
-      pcfg->pht_Monitor_Settings,
-      (GHFunc)gapc_signal_handler_monitor_settings_connect,
-      pcfg);
 
    return TRUE;
 }
@@ -4979,7 +5074,6 @@ static void cb_monitor_interface_destroy(GtkWidget * widget, PGAPC_MONITOR pm)
 
    g_mutex_free(pm->gm_update);
    g_async_queue_unref(pm->q_network);
-
 
    for (h_index = 0; h_index < GAPC_LINEGRAPH_MAX_SERIES; h_index++) {
       if (pm->phs.sq[h_index].gm_graph != NULL) {
@@ -5152,7 +5246,6 @@ static GtkWidget *gapc_main_interface_create(PGAPC_CONFIG pcfg)
    g_object_ref (pcfg->tooltips);
    gtk_object_sink (GTK_OBJECT(pcfg->tooltips));
    pcfg->b_run = TRUE;
-   pcfg->cb_last_monitor_deleted = 0;
 
    /*
     * Create the top level window for the notebook to be packed into.*/
@@ -5337,7 +5430,7 @@ static gint gapc_monitor_history_page(PGAPC_MONITOR pm, GtkWidget * notebook)
    }
 
    pm->tid_graph_refresh =
-      gtk_timeout_add(((guint) (pphs->d_xinc * GAPC_REFRESH_FACTOR_1K )),
+      g_timeout_add(((guint) (pphs->d_xinc * GAPC_REFRESH_FACTOR_1K )),
       (GSourceFunc) cb_util_line_chart_refresh, pphs);
 
    /* collect one right away */
@@ -6139,15 +6232,12 @@ static void gapc_monitor_interface_destroy(PGAPC_CONFIG pcfg, guint i_monitor)
          i_monitor)) {
       gtk_tree_model_get(pcfg->monitor_model, &iter, GAPC_MON_POINTER, &pm, -1);
    }
-
    if ((pm == NULL) || (pm->window == NULL)) {
       return;
    }
-
    if (!pm->cb_enabled) {
       return;
    }
-
    pm->b_run = FALSE;
 
    gtk_list_store_remove(GTK_LIST_STORE(pcfg->monitor_model), &iter);
@@ -6209,7 +6299,7 @@ extern int main(int argc, char *argv[])
        gtk_window_present(GTK_WINDOW(pcfg->window));
    }
 
-   gapc_panel_gsettings_watch(pcfg);
+   gapc_gsettings_watch(pcfg);
 
    /*
     * enter the GTK main loop

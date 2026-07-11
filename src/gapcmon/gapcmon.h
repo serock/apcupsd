@@ -351,7 +351,6 @@ typedef struct _System_Control_Data {
    GtkTreeModel *prefs_model;      /* GtkListStore */
    GtkTreeView *prefs_treeview;
    GtkTreeSelection *prefs_select;
-   guint cb_last_monitor_deleted;  // XXX /* overide gconf inconsistency on kde */
 
    GtkTreeModel *monitor_model;    /* GtkListStore */
    GtkTreeView *monitor_treeview;
