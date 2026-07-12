@@ -1,0 +1,51 @@
+# Text files
+
+*            text=auto whitespace=blank-at-eol,-blank-at-eof
+*.bat        text
+*.c          text whitespace=blank-at-eol,-blank-at-eof,tab-in-indent,tabwidth=3
+*.conf       text
+*.cpp        text whitespace=blank-at-eol,-blank-at-eof,tab-in-indent,tabwidth=3
+*.cpufreq    text
+*.css        text
+*.def        text
+*.ex         text
+*.fdi        text
+*.h          text whitespace=blank-at-eol,-blank-at-eof,tab-in-indent,tabwidth=3
+*.html       text
+*.in         text
+*.inf        text
+*.ini        text
+*.m          text
+*.mak        text
+*.nsh        text
+*.nsi        text
+*.patch      text
+*.php        text
+*.rc         text
+*.rpt        text
+*.rst        text
+*.sh         text
+*.snmp       text
+*.spec       text
+*.status     text
+*.tcl        text
+*.txt        text
+*.vbs        text
+*.xib        text
+aclocal.m4   text
+apcupsd.m4   text whitespace=blank-at-eol,-blank-at-eof,tab-in-indent,tabwidth=4
+configure.ac text whitespace=blank-at-eol,-blank-at-eof,tab-in-indent,tabwidth=3
+Makefile     text
+Makefile.am  text whitespace=blank-at-eol,-blank-at-eof,tab-in-indent,tabwidth=3
+Makefile.in  text
+README       text
+
+# Binary files
+
+*.bmp   binary
+*.cat   binary
+*.ico   binary
+*.nib   binary
+*.pdf   binary
+*.png   binary
+
