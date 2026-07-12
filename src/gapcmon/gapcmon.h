@@ -219,6 +219,7 @@ typedef struct _LGRAPH_RANGES {
 
 typedef struct _LG_GRAPH {
     GAPCDataID  cb_id;
+    guint       tid_configure;  /* timeout after configure event */
     GtkWidget  *drawing_area;
     GdkPixmap  *pixmap;         /* --- Backing pixmap for drawing area  --- */
     GdkGC      *window_gc;
@@ -299,8 +300,12 @@ typedef struct _Monitor_Instance_Data {
    GMutex *gm_update;              /* Control mutex for hashtables and thread */
    GAsyncQueue *q_network;
    guint i_netbusy_counter;
-   guint tid_automatic_refresh;    /* monitor refresh timer id */
+   guint tid_auto_refresh;         /* monitor refresh timer id */
+   guint tid_auto_refresh_control;
    guint tid_graph_refresh;
+   guint tid_graph_refresh_control;
+   guint tid_graph_startup;
+   guint tid_one_time_refresh;
    gboolean b_data_available;      /* Flag from thread indicating data ready */
    gboolean b_network_control;     /* TRUE signals resolve address needed */
 

@@ -184,6 +184,7 @@ static void cb_panel_preferences_gsettings_changed(
    GSettings *monitor_settings,
    gchar *key,
    PGAPC_CONFIG pcfg);
+static gboolean gapc_timeout_graph_refresh(PGAPC_HISTORY pphs);
 
 /*
  * Common interface to the various versions of gethostbyname_r().
@@ -1313,6 +1314,17 @@ static gboolean lg_graph_draw (PLGRAPH plg)
     return G_SOURCE_REMOVE;
 }
 
+static gboolean gapc_timeout_drawing_area_configure(PLGRAPH plg)
+{
+   gboolean return_value;
+
+   return_value = lg_graph_draw(plg);
+   if (return_value == G_SOURCE_REMOVE) {
+      plg->tid_configure = 0;
+   }
+   return return_value;
+}
+
 /*
  * configure_event
  *
@@ -1388,7 +1400,15 @@ static gboolean lg_graph_configure_event_cb (GtkWidget * widget,
     plg->x_range.i_minor_inc = plg->plot_box.width / plg->x_range.i_num_minor;
     plg->x_range.i_major_inc = plg->plot_box.width / plg->x_range.i_num_major;
 
-    g_timeout_add (250, (GSourceFunc) lg_graph_draw, plg);
+    if (plg->tid_configure != 0) {
+       if (g_source_remove(plg->tid_configure)) {
+          plg->tid_configure = 0;
+       }
+    }
+    plg->tid_configure = g_timeout_add(
+       250,
+       G_SOURCE_FUNC(gapc_timeout_drawing_area_configure),
+       plg);
 
     return TRUE;
 }
@@ -1524,6 +1544,17 @@ static gint gapc_util_change_icons(PGAPC_MONITOR pm)
    return FALSE;
 }
 
+static gboolean gapc_timeout_auto_refresh(PGAPC_MONITOR pm)
+{
+   gboolean return_value;
+
+   return_value = cb_monitor_automatic_refresh(pm);
+   if (return_value == G_SOURCE_REMOVE) {
+      pm->tid_auto_refresh = 0;
+   }
+   return return_value;
+}
+
 /*
  * used to switch timers when d_refresh changes
  * b_timer_control True trigger the target timer to stop and have this one
@@ -1542,9 +1573,10 @@ static gboolean cb_util_line_chart_refresh_control(PGAPC_MONITOR pm)
    pm->b_graph_control = FALSE;
    pm->phs.d_xinc = pm->d_graph * pm->d_refresh;
 
-   pm->tid_graph_refresh =
-      g_timeout_add((guint) (pm->phs.d_xinc * GAPC_REFRESH_FACTOR_1K ),
-      (GSourceFunc) cb_util_line_chart_refresh, &pm->phs);
+   pm->tid_graph_refresh = g_timeout_add(
+      (guint) (pm->phs.d_xinc * GAPC_REFRESH_FACTOR_1K ),
+      G_SOURCE_FUNC(gapc_timeout_graph_refresh),
+      &pm->phs);
 
    pch = g_strdup_printf(
                  "<i>sampled every %3.1f seconds</i>",
@@ -1565,6 +1597,17 @@ static gboolean cb_util_line_chart_refresh_control(PGAPC_MONITOR pm)
    return G_SOURCE_REMOVE;
 }
 
+static gboolean gapc_timeout_graph_refresh_control(PGAPC_MONITOR pm)
+{
+   gboolean return_value;
+
+   return_value = cb_util_line_chart_refresh_control(pm);
+   if (return_value == G_SOURCE_REMOVE) {
+      pm->tid_graph_refresh_control = 0;
+   }
+   return return_value;
+}
+
 /*
  * used to switch timers when d_refresh changes
  * b_timer_control True trigger the target timer to stop and have this one
@@ -1582,13 +1625,14 @@ static gboolean cb_monitor_refresh_control(PGAPC_MONITOR pm)
 
    pm->b_timer_control = FALSE;
 
-   pm->tid_automatic_refresh =
-      g_timeout_add((guint) (pm->d_refresh * GAPC_REFRESH_FACTOR_1K),
-      (GSourceFunc) cb_monitor_automatic_refresh, pm);
+   pm->tid_auto_refresh = g_timeout_add(
+      (guint) (pm->d_refresh * GAPC_REFRESH_FACTOR_1K),
+      G_SOURCE_FUNC(gapc_timeout_auto_refresh),
+      pm);
 
    w = g_hash_table_lookup(pm->pht_Widgets, "StatusBar");
 
-   if ((pm->tid_automatic_refresh != 0) && (w != NULL)) {
+   if ((pm->tid_auto_refresh != 0) && (w != NULL)) {
       gtk_statusbar_pop(GTK_STATUSBAR(w), pm->i_info_context);
       pch1 = g_strdup_printf("Refresh Cycle Change for host %s Completed!...",
          pm->pch_host);
@@ -1598,8 +1642,30 @@ static gboolean cb_monitor_refresh_control(PGAPC_MONITOR pm)
    return G_SOURCE_REMOVE;
 }
 
+static gboolean gapc_timeout_auto_refresh_control(PGAPC_MONITOR pm)
+{
+   gboolean return_value;
+
+   return_value = cb_monitor_refresh_control(pm);
+   if (return_value == G_SOURCE_REMOVE) {
+      pm->tid_auto_refresh_control = 0;
+   }
+   return return_value;
+}
+
+static gboolean gapc_timeout_one_time_refresh(PGAPC_MONITOR pm)
+{
+   gboolean return_value;
+
+   return_value = cb_monitor_dedicated_one_time_refresh(pm);
+   if (return_value == G_SOURCE_REMOVE) {
+      pm->tid_one_time_refresh = 0;
+   }
+   return return_value;
+}
+
 /*
- * timer service routine for IPL refresh and refresh_button.
+ * timer service routine for refresh_button.
  * used to overcome the multi-threaded startup delay.  very short
  */
 static gboolean cb_monitor_dedicated_one_time_refresh(PGAPC_MONITOR pm)
@@ -1641,7 +1707,7 @@ static gboolean cb_monitor_dedicated_one_time_refresh(PGAPC_MONITOR pm)
          gtk_statusbar_push(GTK_STATUSBAR(w), pm->i_info_context, pch1);
          g_clear_pointer(&pch1, g_free);
       }
-      if (pm->i_netbusy_counter++ % 10) {       /* Fall thru and quit after ten trys */
+      if (pm->i_netbusy_counter++ % 10) {       /* Fall thru and quit after ten tries */
          g_mutex_unlock(pm->gm_update);
          gdk_flush();
          gdk_threads_leave();
@@ -1676,7 +1742,10 @@ static gboolean cb_monitor_automatic_refresh(PGAPC_MONITOR pm)
       return G_SOURCE_REMOVE;      /* stop timers */
 
    if (pm->b_timer_control) {
-      g_timeout_add(100, (GSourceFunc) cb_monitor_refresh_control, pm);
+      pm->tid_auto_refresh_control = g_timeout_add(
+         100,
+         G_SOURCE_FUNC(gapc_timeout_auto_refresh_control),
+         pm);
       return G_SOURCE_REMOVE;
    }
 
@@ -4394,13 +4463,15 @@ static void cb_monitor_interface_button_refresh(GtkWidget * button, PGAPC_MONITO
 {
    g_return_if_fail(pm != NULL);
 
-   if ((!pm->b_run) || !(pm->cb_enabled) || (pm->window == NULL)) {
+   if ((!pm->b_run) || !(pm->cb_enabled) || (pm->window == NULL) ||
+       (pm->tid_one_time_refresh != 0)) {
       return;
    }
-
    g_async_queue_push(pm->q_network, pm);
-   g_timeout_add(GAPC_REFRESH_FACTOR_ONE_TIME,
-      (GSourceFunc) cb_monitor_dedicated_one_time_refresh, pm);
+   pm->tid_one_time_refresh = g_timeout_add(
+      GAPC_REFRESH_FACTOR_ONE_TIME,
+      G_SOURCE_FUNC(gapc_timeout_one_time_refresh),
+      pm);
 
    return;
 }
@@ -5059,13 +5130,41 @@ static void cb_monitor_interface_destroy(GtkWidget * widget, PGAPC_MONITOR pm)
 
    pm->b_run = FALSE;
 
-   if (pm->tid_graph_refresh) {
-      g_source_remove(pm->tid_graph_refresh);
+   if (pm->tid_graph_refresh != 0) {
+      if (g_source_remove(pm->tid_graph_refresh)) {
+         pm->tid_graph_refresh = 0;
+      }
    }
-   if (pm->tid_automatic_refresh) {
-      g_source_remove(pm->tid_automatic_refresh);
+   if (pm->tid_graph_startup != 0) {
+      if (g_source_remove(pm->tid_graph_startup)) {
+         pm->tid_graph_refresh = 0;
+      }
    }
-
+   if (pm->tid_auto_refresh != 0) {
+      if (g_source_remove(pm->tid_auto_refresh)) {
+         pm->tid_auto_refresh = 0;
+      }
+   }
+   if (pm->phs.plg->tid_configure != 0) {
+      if (g_source_remove(pm->phs.plg->tid_configure)) {
+         pm->phs.plg->tid_configure = 0;
+      }
+   }
+   if (pm->tid_one_time_refresh != 0) {
+      if (g_source_remove(pm->tid_one_time_refresh)) {
+         pm->tid_one_time_refresh = 0;
+      }
+   }
+   if (pm->tid_auto_refresh_control != 0) {
+      if (g_source_remove(pm->tid_auto_refresh_control)) {
+         pm->tid_auto_refresh_control = 0;
+      }
+   }
+   if (pm->tid_graph_refresh_control != 0) {
+      if (g_source_remove(pm->tid_graph_refresh_control)) {
+         pm->tid_graph_refresh_control = 0;
+      }
+   }
    if (pm->tid_thread_qwork != NULL) {
       pm->b_thread_stop = TRUE;
       g_async_queue_push(pm->q_network, pm);
@@ -5362,6 +5461,34 @@ static GtkWidget *gapc_main_interface_create(PGAPC_CONFIG pcfg)
    return GTK_WIDGET(window);
 }
 
+static gboolean gapc_timeout_graph_refresh(PGAPC_HISTORY pphs)
+{
+   gboolean return_value;
+   PGAPC_MONITOR pm = NULL;
+
+   return_value = cb_util_line_chart_refresh(pphs);
+
+   if (return_value == G_SOURCE_REMOVE) {
+      pm = (PGAPC_MONITOR)pphs->gp;
+      pm->tid_graph_refresh = 0;
+   }
+   return return_value;
+}
+
+static gboolean gapc_timeout_graph_startup(PGAPC_HISTORY pphs)
+{
+   gboolean return_value;
+   PGAPC_MONITOR pm = NULL;
+
+   return_value = cb_util_line_chart_refresh(pphs);
+
+   if (return_value == G_SOURCE_REMOVE) {
+      pm = (PGAPC_MONITOR)pphs->gp;
+      pm->tid_graph_startup = 0;
+   }
+   return return_value;
+}
+
 /*
  * Creates a GtkGLGraph histogram linechart page
 */
@@ -5429,14 +5556,17 @@ static gint gapc_monitor_history_page(PGAPC_MONITOR pm, GtkWidget * notebook)
        lg_graph_set_chart_title (plg, pm->ch_title_info);
    }
 
-   pm->tid_graph_refresh =
-      g_timeout_add(((guint) (pphs->d_xinc * GAPC_REFRESH_FACTOR_1K )),
-      (GSourceFunc) cb_util_line_chart_refresh, pphs);
+   pm->tid_graph_refresh = g_timeout_add(
+      (guint) (pphs->d_xinc * GAPC_REFRESH_FACTOR_1K ),
+      G_SOURCE_FUNC(gapc_timeout_graph_refresh),
+      pphs);
 
    /* collect one right away */
    pphs->b_startup = TRUE;
-   g_timeout_add((guint) (pm->d_refresh * GAPC_REFRESH_FACTOR_1K + 75),
-      (GSourceFunc) cb_util_line_chart_refresh, pphs);
+   pm->tid_graph_startup = g_timeout_add(
+      (guint) (pm->d_refresh * GAPC_REFRESH_FACTOR_1K + 75),
+      G_SOURCE_FUNC(gapc_timeout_graph_startup),
+      pphs);
 
    return i_page;
 }
@@ -5463,7 +5593,10 @@ static gboolean cb_util_line_chart_refresh(PGAPC_HISTORY pg)
       return G_SOURCE_REMOVE;
 
    if (pm->b_graph_control) {
-      g_timeout_add(100, (GSourceFunc) cb_util_line_chart_refresh_control, pm);
+      pm->tid_graph_refresh_control = g_timeout_add(
+         100,
+         G_SOURCE_FUNC(gapc_timeout_graph_refresh_control),
+         pm);
       return G_SOURCE_REMOVE;
    }
 
@@ -6186,9 +6319,10 @@ static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, guint i_monit
 
    g_async_queue_push(pm->q_network, (gpointer) pm);
 
-   pm->tid_automatic_refresh =
-      g_timeout_add((guint) (pm->d_refresh * GAPC_REFRESH_FACTOR_1K),
-      (GSourceFunc) cb_monitor_automatic_refresh, pm);
+   pm->tid_auto_refresh = g_timeout_add(
+      (guint) (pm->d_refresh * GAPC_REFRESH_FACTOR_1K),
+      G_SOURCE_FUNC(gapc_timeout_auto_refresh),
+      pm);
 
    pm->menu = g_object_ref_sink(gtk_menu_new());
    menu = pm->menu;

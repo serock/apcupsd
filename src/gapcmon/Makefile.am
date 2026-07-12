@@ -8,3 +8,4 @@ gsettings_SCHEMAS = data/org.apcupsd.Gapcmon.gschema.xml
 
 @GSETTINGS_RULES@
 
+EXTRA_DIST = $(gsettings_SCHEMAS)
