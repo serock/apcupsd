@@ -316,7 +316,6 @@ typedef struct _Monitor_Instance_Data {
    GHashTable *pht_Status;         /* Private hashtable status key=values */
    GHashTable *pht_Widgets;        /* Private hashtable holding widget ptrs  */
 
-   GtkTooltips *tooltips;
    guint i_icon_index;
    gint i_old_icon_index;
    gint i_icon_size;
@@ -362,11 +361,9 @@ typedef struct _System_Control_Data {
    GtkTreeSelection *monitor_select;
 
    GtkWidget *image;
-   GtkTooltips *tooltips;
 
    EggTrayIcon *tray_icon;
    GtkWidget *tray_image;
-   GtkTooltips *tray_tooltips;
    gint i_icon_size;
    gint i_icon_height;
    gint i_icon_width;

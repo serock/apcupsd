@@ -275,7 +275,7 @@ static gint lg_graph_data_series_draw_all (PLGRAPH plg, gboolean redraw_control)
 
     g_return_val_if_fail (plg != NULL, -1);
 
-    if ( !(GTK_WIDGET_DRAWABLE (plg->drawing_area)) ) {
+    if ( !(gtk_widget_is_drawable(plg->drawing_area)) ) {
         return -1;
     }
 
@@ -742,7 +742,7 @@ static gint lg_graph_draw_grid_lines (PLGRAPH plg)
     GdkSegment *seg_major = NULL;
 
     g_return_val_if_fail (plg != NULL, -1);
-    g_return_val_if_fail (GTK_WIDGET_DRAWABLE (plg->drawing_area), -1);
+    g_return_val_if_fail (gtk_widget_is_drawable(plg->drawing_area), -1);
 
     drawing_area = plg->drawing_area;
 
@@ -855,7 +855,7 @@ static gint lg_graph_draw_tooltip (PLGRAPH plg)
     gboolean    b_found = FALSE;
 
     g_return_val_if_fail (plg != NULL, -1);
-    g_return_val_if_fail (GTK_WIDGET_DRAWABLE (plg->drawing_area), -1);
+    g_return_val_if_fail (gtk_widget_is_drawable(plg->drawing_area), -1);
 
     if (!plg->b_tooltip_active)
     {
@@ -989,7 +989,7 @@ static gint lg_graph_draw_vertical_text (PLGRAPH plg,
     g_return_val_if_fail (plg != NULL, -1);
     g_return_val_if_fail (pch_text != NULL, -1);
     g_return_val_if_fail (rect != NULL, -1);
-    g_return_val_if_fail (GTK_WIDGET_DRAWABLE (plg->drawing_area), -1);
+    g_return_val_if_fail (gtk_widget_is_drawable(plg->drawing_area), -1);
 
     if (rect->width && redraw_control)
     {
@@ -1061,7 +1061,7 @@ static gint lg_graph_draw_vertical_text (PLGRAPH plg,
     g_return_val_if_fail (plg != NULL, -1);
     g_return_val_if_fail (pch_text != NULL, -1);
     g_return_val_if_fail (rect != NULL, -1);
-  g_return_val_if_fail (GTK_WIDGET_DRAWABLE (plg->drawing_area), -1);
+  g_return_val_if_fail (gtk_widget_is_drawable(plg->drawing_area), -1);
 
 
   context = gtk_widget_get_pango_context (plg->drawing_area);
@@ -1142,7 +1142,7 @@ static gint lg_graph_draw_horizontal_text (PLGRAPH plg,
     g_return_val_if_fail (plg != NULL, -1);
     g_return_val_if_fail (pch_text != NULL, -1);
     g_return_val_if_fail (rect != NULL, -1);
-    g_return_val_if_fail (GTK_WIDGET_DRAWABLE (plg->drawing_area), -1);
+    g_return_val_if_fail (gtk_widget_is_drawable(plg->drawing_area), -1);
 
     if (rect->width && redraw_control)
     {
@@ -1249,7 +1249,7 @@ static gboolean lg_graph_draw (PLGRAPH plg)
 
     drawing_area = plg->drawing_area;
 
-    if ( !(GTK_WIDGET_DRAWABLE (drawing_area)) ) {
+    if ( !(gtk_widget_is_drawable(drawing_area)) ) {
         return G_SOURCE_CONTINUE;
     }
 
@@ -1429,7 +1429,7 @@ static gint lg_graph_expose_event_cb (GtkWidget * widget, GdkEventExpose * event
 
     /* --- Copy pixmap to the window --- */
     gdk_draw_pixmap (widget->window,
-                     widget->style->fg_gc[GTK_WIDGET_STATE (widget)],
+                     widget->style->fg_gc[gtk_widget_get_state(widget)],
                      plg->pixmap,
                      event->area.x, event->area.y,
                      event->area.x, event->area.y, event->area.width, event->area.height);
@@ -2021,8 +2021,8 @@ static gboolean gapc_monitor_update_tooltip_msg(PGAPC_MONITOR pm)
       b_flag = FALSE;
    }
 
-   if ((pm->tooltips != NULL) && (pm->tray_icon != NULL)) {
-      gtk_tooltips_set_tip(pm->tooltips, GTK_WIDGET(pm->tray_icon), pmsg, NULL);
+   if (pm->tray_icon != NULL) {
+      gtk_widget_set_tooltip_text(GTK_WIDGET(pm->tray_icon), pmsg);
       if (b_flag) {
          gapc_util_change_icons(pm);
       }
@@ -2111,7 +2111,7 @@ static gint gapc_monitor_update(PGAPC_MONITOR pm)
    pbar->d_value = dValue;
    g_snprintf(pbar->c_text, sizeof(pbar->c_text), "%s from Utility", pch);
    w = g_hash_table_lookup(pm->pht_Widgets, "HBar1-Widget");
-   if (GTK_WIDGET_DRAWABLE(w))
+   if (gtk_widget_is_drawable(w))
       gdk_window_invalidate_rect(w->window, &pbar->rect, FALSE);
 
    pch = g_hash_table_lookup(pm->pht_Status, "BATTV");
@@ -2133,7 +2133,7 @@ static gint gapc_monitor_update(PGAPC_MONITOR pm)
    g_snprintf(pbar->c_text, sizeof(pbar->c_text), "%s DC on Battery", pch);
 
    w = g_hash_table_lookup(pm->pht_Widgets, "HBar2-Widget");
-   if (GTK_WIDGET_DRAWABLE(w))
+   if (gtk_widget_is_drawable(w))
       gdk_window_invalidate_rect(w->window, &pbar->rect, FALSE);
 
    pch = g_hash_table_lookup(pm->pht_Status, "BCHARGE");
@@ -2147,7 +2147,7 @@ static gint gapc_monitor_update(PGAPC_MONITOR pm)
    pbar->d_value = dValue;
    g_snprintf(pbar->c_text, sizeof(pbar->c_text), "%s Battery Charge", pch);
    w = g_hash_table_lookup(pm->pht_Widgets, "HBar3-Widget");
-   if (GTK_WIDGET_DRAWABLE(w))
+   if (gtk_widget_is_drawable(w))
       gdk_window_invalidate_rect(w->window, &pbar->rect, FALSE);
 
    pch = g_hash_table_lookup(pm->pht_Status, "LOADPCT");
@@ -2162,7 +2162,7 @@ static gint gapc_monitor_update(PGAPC_MONITOR pm)
    g_snprintf(pbar->c_text, sizeof(pbar->c_text), "%s", pch);
 
    w = g_hash_table_lookup(pm->pht_Widgets, "HBar4-Widget");
-   if (GTK_WIDGET_DRAWABLE(w))
+   if (gtk_widget_is_drawable(w))
       gdk_window_invalidate_rect(w->window, &pbar->rect, FALSE);
 
    pch = g_hash_table_lookup(pm->pht_Status, "TIMELEFT");
@@ -2177,7 +2177,7 @@ static gint gapc_monitor_update(PGAPC_MONITOR pm)
    pbar->d_value = dValue;
    g_snprintf(pbar->c_text, sizeof(pbar->c_text), "%s Remaining", pch);
    w = g_hash_table_lookup(pm->pht_Widgets, "HBar5-Widget");
-   if (GTK_WIDGET_DRAWABLE(w))
+   if (gtk_widget_is_drawable(w))
       gdk_window_invalidate_rect(w->window, &pbar->rect, FALSE);
 
    /*
@@ -3008,7 +3008,7 @@ static gboolean cb_util_barchart_handle_exposed(GtkWidget * widget,
       (gdouble) (pbar->d_value * 100.0));
 
    /* the frame of the chart */
-   gtk_paint_box(widget->style, widget->window, GTK_WIDGET_STATE(widget),
+   gtk_paint_box(widget->style, widget->window, gtk_widget_get_state(widget),
       GTK_SHADOW_ETCHED_IN, &pbar->rect, widget, "gapc_hbar_frame", 0, 0,
       widget->allocation.width - 1, widget->allocation.height - 1);
 
@@ -3369,7 +3369,6 @@ static gboolean gapc_panel_systray_icon_create(gpointer gp)
    EggTrayIcon **tray_icon = NULL;
    GtkWidget **tray_image = NULL;
    GdkPixbuf *pixbuf = NULL;
-   GtkTooltips *tooltips = NULL;
    gchar *pch_title = NULL;
 
    g_return_val_if_fail(gp != NULL, FALSE);
@@ -3379,7 +3378,6 @@ static gboolean gapc_panel_systray_icon_create(gpointer gp)
       pm = (PGAPC_MONITOR) gp;
       tray_icon = &pm->tray_icon;
       tray_image = &pm->tray_image;
-      tooltips = pm->tooltips;
       pixbuf = pm->my_icons[GAPC_ICON_DEFAULT];
 
       if (!pm->cb_use_systray) {
@@ -3392,7 +3390,6 @@ static gboolean gapc_panel_systray_icon_create(gpointer gp)
       pcfg = (PGAPC_CONFIG) gp;
       tray_icon = &pcfg->tray_icon;
       tray_image = &pcfg->tray_image;
-      tooltips = pcfg->tooltips;
       pixbuf = pcfg->my_icons[GAPC_ICON_DEFAULT];
       pch_title = GAPC_WINDOW_TITLE;
 
@@ -3422,9 +3419,7 @@ static gboolean gapc_panel_systray_icon_create(gpointer gp)
 
    gtk_widget_show_all(GTK_WIDGET(*tray_icon));
 
-   if (tooltips != NULL) {
-      gtk_tooltips_set_tip(tooltips, GTK_WIDGET(*tray_icon), pch_title, NULL);
-   }
+   gtk_widget_set_tooltip_text(GTK_WIDGET(*tray_icon), pch_title);
 
    return TRUE;
 }
@@ -4313,16 +4308,18 @@ static gint gapc_panel_preferences_page(PGAPC_CONFIG pcfg, GtkNotebook * noteboo
    cbox = gtk_button_new_from_stock(GTK_STOCK_ADD);
    g_signal_connect(cbox, "clicked", G_CALLBACK(cb_panel_prefs_button_add_rec),
       pcfg);
-   gtk_tooltips_set_tip(pcfg->tooltips, GTK_WIDGET(cbox),
-      "Adds a new monitor\ndefinition to the system.", NULL);
+   gtk_widget_set_tooltip_text(
+      GTK_WIDGET(cbox),
+      "Adds a new monitor\ndefinition to the system.");
    gtk_box_pack_start(GTK_BOX(box), cbox, FALSE, FALSE, 2);
    gtk_widget_show(cbox);
 
    cbox = gtk_button_new_from_stock(GTK_STOCK_REMOVE);
    g_signal_connect(cbox, "clicked", G_CALLBACK(cb_panel_prefs_button_remove_rec),
       pcfg);
-   gtk_tooltips_set_tip(pcfg->tooltips, GTK_WIDGET(cbox),
-      "Removes selected monitor\ndefinition from the system.", NULL);
+   gtk_widget_set_tooltip_text(
+      GTK_WIDGET(cbox),
+      "Removes selected monitor\ndefinition from the system.");
    gtk_box_pack_start(GTK_BOX(box), cbox, FALSE, FALSE, 2);
    gtk_widget_show(cbox);
 
@@ -4340,8 +4337,9 @@ static gint gapc_panel_preferences_page(PGAPC_CONFIG pcfg, GtkNotebook * noteboo
    gtk_toggle_button_set_active(
       GTK_TOGGLE_BUTTON(cbox),
       g_settings_get_boolean(pcfg->controller_settings, GAPC_SYSTRAY_KEY));
-   gtk_tooltips_set_tip(pcfg->tooltips, GTK_WIDGET(cbox),
-      "Creates a notification area icon\nfor this control panel.", NULL);
+   gtk_widget_set_tooltip_text(
+      GTK_WIDGET(cbox),
+      "Creates a notification area icon\nfor this control panel.");
    gtk_box_pack_start(GTK_BOX(box), cbox, FALSE, FALSE, 2);
    gtk_widget_show(cbox);
    g_hash_table_insert(pcfg->pht_Widgets, g_strdup(GAPC_SYSTRAY_KEY), cbox);
@@ -5202,8 +5200,6 @@ static void cb_monitor_interface_destroy(GtkWidget * widget, PGAPC_MONITOR pm)
       g_clear_object(&pm->menu);
    }
 
-   g_object_unref (pm->tooltips);
-
    lg_graph_data_series_remove_all ( pm->phs.plg );
 
    sbar = g_hash_table_lookup (pcfg->pht_Widgets, "StatusBar");
@@ -5263,9 +5259,6 @@ static void cb_main_interface_destroy(GtkWidget * widget, PGAPC_CONFIG pcfg)
    for (x = 0; x < GAPC_N_ICONS; x++) {
       g_object_unref(pcfg->my_icons[x]);
    }
-
-   g_object_unref (pcfg->tooltips);
-
    gapc_panel_gsettings_destroy(pcfg);
 
    gtk_main_quit();
@@ -5341,9 +5334,6 @@ static GtkWidget *gapc_main_interface_create(PGAPC_CONFIG pcfg)
    pcfg->pht_Monitor_Settings = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_object_unref);
    pixbuf = pcfg->my_icons[GAPC_ICON_DEFAULT];
    pcfg->b_visible = FALSE;
-   pcfg->tooltips = gtk_tooltips_new();
-   g_object_ref (pcfg->tooltips);
-   gtk_object_sink (GTK_OBJECT(pcfg->tooltips));
    pcfg->b_run = TRUE;
 
    /*
@@ -5394,6 +5384,7 @@ static GtkWidget *gapc_main_interface_create(PGAPC_CONFIG pcfg)
    gtk_box_pack_end(GTK_BOX(lbox), bbox, FALSE, FALSE, 0);
    gtk_widget_show(bbox);
    box = gtk_hbutton_box_new();
+   gtk_button_box_set_layout (GTK_BUTTON_BOX (box), GTK_BUTTONBOX_SPREAD);
    gtk_container_set_border_width(GTK_CONTAINER(box), 6);
    gtk_box_pack_end(GTK_BOX(bbox), box, FALSE, FALSE, 2);
    gtk_widget_show(box);
@@ -5402,7 +5393,6 @@ static GtkWidget *gapc_main_interface_create(PGAPC_CONFIG pcfg)
    notebook = gtk_notebook_new();
    gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook), GTK_POS_TOP);
    gtk_notebook_set_scrollable(GTK_NOTEBOOK(notebook), TRUE);
-   gtk_notebook_set_homogeneous_tabs(GTK_NOTEBOOK(notebook), TRUE);
    gtk_box_pack_start(GTK_BOX(nbox), notebook, TRUE, TRUE, 0);
    gtk_widget_show(notebook);
 
@@ -5681,7 +5671,7 @@ static PLGRAPH lg_graph_create (GtkWidget * box, gint width, gint height)
     gtk_widget_set_events (drawing_area,
                            GDK_EXPOSURE_MASK | GDK_BUTTON_PRESS_MASK |
                            GDK_POINTER_MOTION_MASK | GDK_POINTER_MOTION_HINT_MASK);
-    gtk_drawing_area_size (GTK_DRAWING_AREA (drawing_area), width, height);
+    gtk_widget_set_size_request (GTK_WIDGET (drawing_area), width, height); // XXX TODO revisit on GTK 3
     gtk_box_pack_start (GTK_BOX (box), drawing_area, TRUE, TRUE, 0);
 
     font_desc = pango_font_description_from_string ("Monospace 10");
@@ -5698,15 +5688,15 @@ static PLGRAPH lg_graph_create (GtkWidget * box, gint width, gint height)
     plg->title_gc = gdk_gc_new (drawing_area->window);
 
     gdk_gc_copy (plg->series_gc,
-                 drawing_area->style->fg_gc[GTK_WIDGET_STATE (drawing_area)]);
+                 drawing_area->style->fg_gc[gtk_widget_get_state(drawing_area)]);
     gdk_gc_copy (plg->window_gc,
-                 drawing_area->style->bg_gc[GTK_WIDGET_STATE (drawing_area)]);
+                 drawing_area->style->bg_gc[gtk_widget_get_state(drawing_area)]);
     gdk_gc_copy (plg->box_gc,
-                 drawing_area->style->fg_gc[GTK_WIDGET_STATE (drawing_area)]);
+                 drawing_area->style->fg_gc[gtk_widget_get_state(drawing_area)]);
     gdk_gc_copy (plg->scale_gc,
-                 drawing_area->style->fg_gc[GTK_WIDGET_STATE (drawing_area)]);
+                 drawing_area->style->fg_gc[gtk_widget_get_state(drawing_area)]);
     gdk_gc_copy (plg->title_gc,
-                 drawing_area->style->text_aa_gc[GTK_WIDGET_STATE (drawing_area)]);
+                 drawing_area->style->text_aa_gc[gtk_widget_get_state(drawing_area)]);
 
     gdk_color_parse (plg->ch_color_window_bg, &color);
     gdk_gc_set_rgb_fg_color (plg->window_gc, &color);
@@ -6195,9 +6185,6 @@ static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, guint i_monit
       GAPC_PREFS_MONITOR, &z_monitor, -1);
 
    pixbuf = pm->my_icons[GAPC_ICON_DEFAULT];
-   pm->tooltips = gtk_tooltips_new();
-   g_object_ref (pm->tooltips);
-   gtk_object_sink (GTK_OBJECT(pm->tooltips));
    pm->gm_update = g_mutex_new();
    monitor_settings_key = g_strdup_printf(GAPC_MONITOR_NAME_OUTPUT_FORMAT, i_monitor);
    pm->monitor_settings = g_hash_table_lookup(
@@ -6267,7 +6254,7 @@ static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, guint i_monit
    gtk_box_pack_end(GTK_BOX(lbox), bbox, FALSE, FALSE, 0);
    gtk_widget_show(bbox);
    box = gtk_hbutton_box_new();
-   gtk_hbutton_box_set_layout_default(GTK_BUTTONBOX_SPREAD);
+   gtk_button_box_set_layout (GTK_BUTTON_BOX (box), GTK_BUTTONBOX_SPREAD);
    gtk_container_set_border_width(GTK_CONTAINER(box), 4);
    gtk_box_pack_end(GTK_BOX(bbox), box, TRUE, TRUE, 0);
    gtk_widget_show(box);
@@ -6276,7 +6263,6 @@ static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, guint i_monit
    pm->notebook = notebook = gtk_notebook_new();
    gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook), GTK_POS_TOP);
    gtk_notebook_set_scrollable(GTK_NOTEBOOK(notebook), TRUE);
-   gtk_notebook_set_homogeneous_tabs(GTK_NOTEBOOK(notebook), FALSE);
    gtk_box_pack_start(GTK_BOX(nbox), notebook, TRUE, TRUE, 0);
    gtk_widget_show(notebook);
 
@@ -6297,7 +6283,7 @@ static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, guint i_monit
 
    /* refresh Control button */
    button = gtk_button_new_from_stock(GTK_STOCK_REFRESH);
-   GTK_WIDGET_SET_FLAGS(button, GTK_CAN_DEFAULT);
+   gtk_widget_set_can_default(button, TRUE);
    g_signal_connect(button, "clicked",
       G_CALLBACK(cb_monitor_interface_button_refresh), pm);
    gtk_box_pack_end(GTK_BOX(box), button, TRUE, TRUE, 0);
