@@ -207,60 +207,54 @@ static gboolean lg_graph_debug = FALSE;
 */
 static gint lg_graph_data_series_draw (PLGRAPH plg, PLG_SERIES psd)
 {
-    gint        v_index = 0;
-    GdkPoint   *point_pos = NULL;
+   gint      v_index = 0;
+   GdkPoint *point_pos = NULL;
+   cairo_t  *graph_cr = NULL;
 
-    g_return_val_if_fail (plg != NULL, -1);
-    g_return_val_if_fail (psd != NULL, -1);
-    g_return_val_if_fail (psd->point_pos != NULL, -1);
+   g_return_val_if_fail (plg != NULL, -1);
+   g_return_val_if_fail (psd != NULL, -1);
+   g_return_val_if_fail (psd->point_pos != NULL, -1);
 
-    gdk_gc_set_rgb_fg_color (plg->series_gc, &psd->legend_color);
-    gdk_gc_set_line_attributes (plg->series_gc, 2,
-                                GDK_LINE_SOLID, GDK_CAP_BUTT, GDK_JOIN_MITER);
+   if (psd->i_point_count == 0) {
+      return 0;
+   }
+   graph_cr = plg->graph_cr;
+   gdk_cairo_set_source_color (graph_cr, &psd->legend_color);
 
-    point_pos = psd->point_pos;
+   point_pos = psd->point_pos;
 
 /* trap first and only point */
-    if (psd->i_point_count == 0)
-    {
-        return 0;
-    }
-    if (psd->i_point_count == 1)
-    {
-        point_pos[0].x = plg->plot_box.x;
-        point_pos[0].y =
-            (plg->plot_box.y + plg->plot_box.height) -
-            ((psd->lg_point_dvalue[0] *
-              (gdouble) ((gdouble) plg->plot_box.height /
-                         (gdouble) plg->y_range.i_max_scale)));
+   point_pos[0].x = plg->plot_box.x;
+   point_pos[0].y = plg->plot_box.y + plg->plot_box.height -
+                    (psd->lg_point_dvalue[0] *
+                     (gdouble) ((gdouble) plg->plot_box.height /
+                                (gdouble) plg->y_range.i_max_scale));
 
-        gdk_draw_arc (plg->pixmap, plg->series_gc, TRUE,
-                      point_pos[0].x - 1, point_pos[0].y - 2, 3, 3, 0, 360 * 64);
-        return 1;
-    }
+   cairo_new_sub_path (graph_cr);
+   cairo_arc (graph_cr, point_pos[0].x, point_pos[0].y, 2.5, 0.0, 2.0 * G_PI);
+   cairo_fill (graph_cr);
 
-    for (v_index = 0; v_index < psd->i_point_count; v_index++)
-    {
-        point_pos[v_index].x = plg->plot_box.x + (v_index * plg->x_range.i_minor_inc);
-        point_pos[v_index].y = (plg->plot_box.y + plg->plot_box.height) -
-            ((psd->lg_point_dvalue[v_index] *
-              (gdouble) ((gdouble) plg->plot_box.height /
-                         (gdouble) plg->y_range.i_max_scale)));
+   if (psd->i_point_count == 1) {
+      return 1;
+   }
 
-        if ((v_index != 0) && (v_index < psd->i_point_count - 1))
-        {
-            gdk_draw_arc (plg->pixmap, plg->series_gc, TRUE,
-                          point_pos[v_index].x - 1,
-                          point_pos[v_index].y - 2, 3, 3, 0, 360 * 64);
-            gdk_draw_arc (plg->pixmap, plg->series_gc, FALSE,
-                          point_pos[v_index].x - 1,
-                          point_pos[v_index].y - 2, 3, 3, 0, 360 * 64);
-        }
-    }
+   cairo_move_to(graph_cr, point_pos[0].x, point_pos[0].y);
+   for (v_index = 1; v_index < psd->i_point_count; v_index++) {
+      point_pos[v_index].x = plg->plot_box.x + (v_index * plg->x_range.i_minor_inc);
+      point_pos[v_index].y = plg->plot_box.y + plg->plot_box.height -
+                             (psd->lg_point_dvalue[v_index] *
+                              (gdouble) ((gdouble) plg->plot_box.height /
+                                         (gdouble) plg->y_range.i_max_scale));
 
-    gdk_draw_lines (plg->pixmap, plg->series_gc, point_pos, psd->i_point_count);
-
-    return v_index;
+      cairo_line_to(graph_cr, point_pos[v_index].x, point_pos[v_index].y);
+   }
+   cairo_stroke(graph_cr);
+   for (v_index = 1; v_index < psd->i_point_count; v_index++) {
+      cairo_new_sub_path (graph_cr);
+      cairo_arc (graph_cr, point_pos[v_index].x, point_pos[v_index].y, 2.5, 0.0, 2.0 * G_PI);
+      cairo_fill (graph_cr);
+   }
+   return v_index;
 }
 
 /*
@@ -404,10 +398,8 @@ static gboolean lg_graph_data_series_remove_all (PLGRAPH plg)
         data_sets = g_list_next (data_sets);
         i_count++;
     }
-    g_list_free (plg->lg_series);
-    g_list_free (plg->lg_series_time);
-    plg->lg_series = NULL;
-    plg->lg_series_time = NULL;
+    g_clear_pointer (&plg->lg_series, g_list_free);
+    g_clear_pointer (&plg->lg_series_time, g_list_free);
     plg->i_num_series = 0;
     plg->i_points_available = 0;
 
@@ -600,77 +592,73 @@ static gboolean lg_graph_motion_notify_event_cb (GtkWidget * widget,
 */
 static void lg_graph_draw_x_grid_labels (PLGRAPH plg)
 {
-    gchar       ch_grid_label[GAPC_MAX_BUFFER];
-    gchar       ch_work[GAPC_MAX_BUFFER];
-    PangoLayout *layout = NULL;
-    PangoTabArray *p_tabs = NULL;
-    gint        x_adj = 0, x1_adj = 0, width = 0, height = 0, h_index = 0, x_scale = 0;
+   gchar          ch_grid_label[GAPC_MAX_BUFFER];
+   gchar          ch_work[GAPC_MAX_BUFFER];
+   GdkColor       color;
+   PangoLayout   *layout = NULL;
+   PangoTabArray *p_tabs = NULL;
+   gint           x_adj = 0, x1_adj = 0, width = 0, height = 0, h_index = 0, x_scale = 0;
 
-    g_return_if_fail (plg != NULL);
+   g_return_if_fail (plg != NULL);
 
-    g_snprintf (ch_grid_label, GAPC_MAX_BUFFER, "<small>%d</small>",
-                plg->x_range.i_max_scale);
-    layout = gtk_widget_create_pango_layout (plg->drawing_area, ch_grid_label);
+   layout = pango_cairo_create_layout (plg->graph_cr);
+   g_snprintf (ch_grid_label, GAPC_MAX_BUFFER, "<span size=\"x-small\"><tt>%d</tt></span>",
+               plg->x_range.i_max_scale);
 
-    pango_layout_set_markup (layout, ch_grid_label, -1);
-    pango_layout_get_pixel_size (layout, &width, &height);
-    x_adj = width / 2;
-    x1_adj = width / 4;
+   pango_layout_set_markup (layout, ch_grid_label, -1);
+   pango_layout_get_pixel_size (layout, &width, &height);
+   x_adj = width / 2;
+   x1_adj = width / 4;
 
-    g_snprintf (ch_grid_label, GAPC_MAX_BUFFER, "<small>%s", "0");
-    for (h_index = plg->x_range.i_inc_major_scale_by;
-         h_index <= plg->x_range.i_max_scale;
-         h_index += plg->x_range.i_inc_major_scale_by)
-    {
-        g_strlcpy (ch_work, ch_grid_label, GAPC_MAX_BUFFER);
-        g_snprintf (ch_grid_label, GAPC_MAX_BUFFER, "%s\t%d", ch_work, h_index);
-        if (h_index < 10)
-        {
-            x_scale++;
-        }
-    }
-    g_strlcpy (ch_work, ch_grid_label, GAPC_MAX_BUFFER);
-    g_snprintf (ch_grid_label, GAPC_MAX_BUFFER, "%s</small>", ch_work);
+   g_snprintf (ch_grid_label, GAPC_MAX_BUFFER, "<span size=\"x-small\"><tt>%s", "0");
+   for (h_index = plg->x_range.i_inc_major_scale_by;
+        h_index <= plg->x_range.i_max_scale;
+        h_index += plg->x_range.i_inc_major_scale_by) {
 
-    pango_layout_set_markup (layout, ch_grid_label, -1);
+      g_strlcpy (ch_work, ch_grid_label, GAPC_MAX_BUFFER);
+      g_snprintf (ch_grid_label, GAPC_MAX_BUFFER, "%s\t%d", ch_work, h_index);
+      if (h_index < 10) {
+         x_scale++;
+      }
+   }
+   g_strlcpy (ch_work, ch_grid_label, GAPC_MAX_BUFFER);
+   g_snprintf (ch_grid_label, GAPC_MAX_BUFFER, "%s</tt></span>", ch_work);
 
-    if (lg_graph_debug)
-    {
-        g_print ("(%d:%d:%d)x_Labels=[%s]\n", x_adj, x1_adj, x_scale, ch_grid_label);
-    }
+   pango_layout_set_markup (layout, ch_grid_label, -1);
 
-    p_tabs = pango_tab_array_new (plg->x_range.i_num_major, TRUE);
-    for (h_index = 0; h_index <= plg->x_range.i_num_major; h_index++)
-    {
-        gint        xbase = 0;
+   if (lg_graph_debug) {
+      g_print ("(%d:%d:%d)x_Labels=[%s]\n", x_adj, x1_adj, x_scale, ch_grid_label);
+   }
+   p_tabs = pango_tab_array_new (plg->x_range.i_num_major, TRUE);
+   for (h_index = 0; h_index <= plg->x_range.i_num_major; h_index++) {
 
-        if (h_index > x_scale)
-        {
-            xbase = (h_index * plg->x_range.i_major_inc);
-        }
-        else
-        {
-            xbase = (h_index * plg->x_range.i_major_inc) + x1_adj;
-        }
-        if (h_index == 0)
-        {
-            xbase = plg->x_range.i_major_inc + x1_adj;
-        }
-        pango_tab_array_set_tab (p_tabs, h_index, PANGO_TAB_LEFT, xbase);
-    }
-    pango_layout_set_tabs (layout, p_tabs);
+       gint xbase = 0;
 
-    pango_layout_context_changed (layout);
+       if (h_index > x_scale) {
+           xbase = (h_index * plg->x_range.i_major_inc);
+       }
+       else {
+           xbase = (h_index * plg->x_range.i_major_inc) + x1_adj;
+       }
+       if (h_index == 0) {
+           xbase = plg->x_range.i_major_inc + x1_adj;
+       }
+       pango_tab_array_set_tab (p_tabs, h_index, PANGO_TAB_LEFT, xbase);
+   }
+   pango_layout_set_tabs (layout, p_tabs);
+   pango_cairo_update_layout (plg->graph_cr, layout);
 
-    gdk_draw_layout (plg->pixmap,
-                     plg->scale_gc,
-                     plg->plot_box.x - x_adj,
-                     plg->plot_box.y + plg->plot_box.height, layout);
+   gdk_color_parse (plg->ch_color_scale_fg, &color);
+   gdk_cairo_set_source_color (plg->graph_cr, &color);
+   cairo_move_to (
+      plg->graph_cr,
+      (gdouble)plg->plot_box.x - (gdouble)x_adj,
+      (gdouble)plg->plot_box.y + (gdouble)plg->plot_box.height);
+   pango_cairo_show_layout (plg->graph_cr, layout);
+   pango_tab_array_free (p_tabs);
+   g_clear_object (&layout);
 
-    pango_tab_array_free (p_tabs);
-    g_object_unref (layout);
-
-    return;
+   return;
 }
 
 /*
@@ -678,52 +666,66 @@ static void lg_graph_draw_x_grid_labels (PLGRAPH plg)
 */
 static void lg_graph_draw_y_grid_labels (PLGRAPH plg)
 {
-    gchar       ch_grid_label[GAPC_MAX_BUFFER];
-    gchar       ch_work[GAPC_MAX_BUFFER];
-    PangoLayout *layout = NULL;
-    gint        y_adj = 0, width = 0, height = 0, v_index = 0;
+   gchar        ch_grid_label[GAPC_MAX_BUFFER];
+   gchar        ch_work[GAPC_MAX_BUFFER];
+   GdkColor     color;
+   PangoLayout *layout = NULL;
+   gint         y_adj = 0, width = 0, height = 0, v_index = 0;
 
-    g_return_if_fail (plg != NULL);
+   g_return_if_fail (plg != NULL);
 
-    g_snprintf (ch_grid_label, GAPC_MAX_BUFFER, "<small>%d</small>",
-                plg->y_range.i_max_scale);
-    layout = gtk_widget_create_pango_layout (plg->drawing_area, ch_grid_label);
+   layout = pango_cairo_create_layout (plg->graph_cr);
+   g_snprintf (
+      ch_grid_label,
+      GAPC_MAX_BUFFER,
+      "<span size=\"x-small\"><tt>%d</tt></span>",
+      plg->y_range.i_max_scale);
 
-    pango_layout_set_markup (layout, ch_grid_label, -1);
-    pango_layout_get_pixel_size (layout, &width, &height);
-    y_adj = height / 2;
+   pango_layout_set_markup (layout, ch_grid_label, -1);
+   pango_layout_get_pixel_size (layout, &width, &height);
+   y_adj = height / 2;
 
-    g_snprintf (ch_grid_label, GAPC_MAX_BUFFER, "<small>%d", plg->y_range.i_max_scale);
-    for (v_index =
-         plg->y_range.i_max_scale - plg->y_range.i_inc_major_scale_by;
-         v_index > 0; v_index -= plg->y_range.i_inc_major_scale_by)
-    {
-        g_strlcpy (ch_work, ch_grid_label, GAPC_MAX_BUFFER);
-        g_snprintf (ch_grid_label, GAPC_MAX_BUFFER, "%s\n%d", ch_work, v_index);
-    }
-    g_strlcpy (ch_work, ch_grid_label, GAPC_MAX_BUFFER);
-    g_snprintf (ch_grid_label, GAPC_MAX_BUFFER, "%s</small>", ch_work);
+   g_snprintf (
+      ch_grid_label,
+      GAPC_MAX_BUFFER,
+      "<span size=\"x-small\"><tt>%d",
+      plg->y_range.i_max_scale);
+   for (v_index = plg->y_range.i_max_scale - plg->y_range.i_inc_major_scale_by;
+        v_index > 0;
+        v_index -= plg->y_range.i_inc_major_scale_by) {
 
-    pango_layout_set_spacing (layout,
-                              ((plg->y_range.i_major_inc - height) * PANGO_SCALE));
-    pango_layout_set_alignment (layout, PANGO_ALIGN_RIGHT);
-    pango_layout_set_markup (layout, ch_grid_label, -1);
+      g_strlcpy (ch_work, ch_grid_label, GAPC_MAX_BUFFER);
+      g_snprintf (
+         ch_grid_label,
+         GAPC_MAX_BUFFER,
+         "%s\n%d",
+         ch_work, v_index);
+   }
+   g_strlcpy (ch_work, ch_grid_label, GAPC_MAX_BUFFER);
+   g_snprintf (ch_grid_label, GAPC_MAX_BUFFER, "%s</tt></span>", ch_work);
 
-    if (lg_graph_debug)
-    {
-        g_print ("(%d:%d)y_Labels=[%s]\n", y_adj, plg->y_range.i_major_inc,
-                 ch_grid_label);
-    }
+   pango_layout_set_spacing (layout,
+                             ((plg->y_range.i_major_inc - height) * PANGO_SCALE));
+   pango_layout_set_alignment (layout, PANGO_ALIGN_RIGHT);
+   pango_layout_set_markup (layout, ch_grid_label, -1);
 
-    pango_layout_context_changed (layout);
+   if (lg_graph_debug) {
+      g_print ("(%d:%d)y_Labels=[%s]\n", y_adj, plg->y_range.i_major_inc,
+               ch_grid_label);
+   }
+   pango_cairo_update_layout (plg->graph_cr, layout);
 
-    gdk_draw_layout (plg->pixmap,
-                     plg->scale_gc,
-                     plg->plot_box.x - (width * 1.2), plg->plot_box.y - y_adj, layout);
+   gdk_color_parse (plg->ch_color_scale_fg, &color);
+   gdk_cairo_set_source_color (plg->graph_cr, &color);
+   cairo_move_to (
+      plg->graph_cr,
+      (gdouble)plg->plot_box.x - ((gdouble)width * 1.2),
+      (gdouble)plg->plot_box.y - (gdouble)y_adj);
+   pango_cairo_show_layout (plg->graph_cr, layout);
 
-    g_object_unref (layout);
+   g_clear_object (&layout);
 
-    return;
+   return;
 }
 
 /*
@@ -732,111 +734,97 @@ static void lg_graph_draw_y_grid_labels (PLGRAPH plg)
 */
 static gint lg_graph_draw_grid_lines (PLGRAPH plg)
 {
-    GtkWidget  *drawing_area = NULL;
-    gint        y_minor_inc = 0, y_pos = 0, y_index = 0;
-    gint        y_major_inc = 0;
-    gint        x_minor_inc = 0, x_pos = 0, x_index = 0;
-    gint        x_major_inc = 0;
-    gint        count_major = 0, count_minor = 0;
-    GdkSegment *seg_minor = NULL;
-    GdkSegment *seg_major = NULL;
+   GdkColor    color;
+   GtkWidget  *drawing_area = NULL;
+   gint        y_minor_inc = 0, y_pos = 0, y_index = 0;
+   gint        y_major_inc = 0;
+   gint        x_minor_inc = 0, x_pos = 0, x_index = 0;
+   gint        x_major_inc = 0;
+   gint        count_major = 0, count_minor = 0;
 
-    g_return_val_if_fail (plg != NULL, -1);
-    g_return_val_if_fail (gtk_widget_is_drawable(plg->drawing_area), -1);
+   g_return_val_if_fail (plg != NULL, -1);
+   g_return_val_if_fail (gtk_widget_is_drawable(plg->drawing_area), -1);
 
-    drawing_area = plg->drawing_area;
+   drawing_area = plg->drawing_area;
 
-    count_major = plg->y_range.i_num_major;
-    count_minor = plg->y_range.i_num_minor;
-    y_minor_inc = plg->y_range.i_minor_inc;
-    y_major_inc = plg->y_range.i_major_inc;
+   count_major = plg->y_range.i_num_major;
+   count_minor = plg->y_range.i_num_minor;
+   y_minor_inc = plg->y_range.i_minor_inc;
+   y_major_inc = plg->y_range.i_major_inc;
 
-    if (lg_graph_debug)
-    {
-        g_print
-            ("count_major=%d, count_minor=%d, y_minor_inc=%d, y_major_inc=%d\n",
-             count_major, count_minor, y_minor_inc, y_major_inc);
-    }
+   if (lg_graph_debug) {
+      g_print (
+         "count_major=%d, count_minor=%d, y_minor_inc=%d, y_major_inc=%d\n",
+         count_major, count_minor, y_minor_inc, y_major_inc);
+   }
+   x_pos = plg->plot_box.width;
+   y_pos = plg->plot_box.y;
+   gdk_color_parse (plg->ch_color_window_bg, &color);
+   gdk_cairo_set_source_color (plg->graph_cr, &color);
+   cairo_set_line_cap (plg->graph_cr, CAIRO_LINE_CAP_BUTT);
 
-    seg_minor = g_new0 (GdkSegment, count_minor + 8);
-    seg_major = g_new0 (GdkSegment, count_major + 8);
-    x_pos = plg->plot_box.width;
-    y_pos = plg->plot_box.y;
-    for (y_index = 0; y_index < count_minor; y_index++)
-    {
-        seg_minor[y_index].x1 = plg->plot_box.x;
-        seg_minor[y_index].y1 = y_pos + (y_minor_inc * (y_index + 1));
-        seg_minor[y_index].x2 = plg->plot_box.x + x_pos - 2;
-        seg_minor[y_index].y2 = seg_minor[y_index].y1;
-    }
+   cairo_set_line_width (plg-> graph_cr, 1.0);
 
-    x_pos = plg->plot_box.width;
-    y_pos = plg->plot_box.y;
-    for (y_index = 0; y_index < count_major; y_index++)
-    {
-        seg_major[y_index].x1 = plg->plot_box.x;
-        seg_major[y_index].y1 = y_pos + (y_major_inc * (y_index + 1));
-        seg_major[y_index].x2 = plg->plot_box.x + x_pos - 2;
-        seg_major[y_index].y2 = seg_major[y_index].y1;
-    }
+   for (y_index = 0; y_index < count_minor; y_index++) {
+      cairo_move_to (
+         plg->graph_cr,
+         (gdouble)plg->plot_box.x, (gdouble)(y_pos + (y_minor_inc * (y_index + 1))));
+      cairo_rel_line_to (
+         plg->graph_cr,
+         (gdouble)x_pos - 2.0, 0.0);
+   }
+   cairo_stroke(plg->graph_cr);
 
-    gdk_gc_set_line_attributes (plg->window_gc,
-                                1, GDK_LINE_SOLID, GDK_CAP_BUTT, GDK_JOIN_BEVEL);
-    gdk_draw_segments (plg->pixmap, plg->window_gc, seg_minor, count_minor - 1);
+   cairo_set_line_width (plg-> graph_cr, 2.0);
 
-    gdk_gc_set_line_attributes (plg->window_gc,
-                                2, GDK_LINE_SOLID, GDK_CAP_ROUND, GDK_JOIN_BEVEL);
-    gdk_draw_segments (plg->pixmap, plg->window_gc, seg_major, count_major - 1);
+   for (y_index = 0; y_index < count_major; y_index++) {
+      cairo_move_to (
+         plg->graph_cr,
+         (gdouble)plg->plot_box.x, (gdouble)(y_pos + (y_major_inc * (y_index + 1))));
+      cairo_rel_line_to (
+         plg->graph_cr,
+         (gdouble)x_pos - 2.0, 0.0);
+   }
+   cairo_stroke(plg->graph_cr);
 
-    g_clear_pointer (&seg_minor, g_free);
-    g_clear_pointer (&seg_major, g_free);
+   count_major = plg->x_range.i_num_major;
+   count_minor = plg->x_range.i_num_minor;
+   x_minor_inc = plg->x_range.i_minor_inc;
+   x_major_inc = plg->x_range.i_major_inc;
 
-    count_major = plg->x_range.i_num_major;
-    count_minor = plg->x_range.i_num_minor;
-    x_minor_inc = plg->x_range.i_minor_inc;
-    x_major_inc = plg->x_range.i_major_inc;
+   if (lg_graph_debug) {
+      g_print (
+         "count_major=%d, count_minor=%d, x_minor_inc=%d, x_major_inc=%d\n",
+         count_major, count_minor, x_minor_inc, x_major_inc);
+   }
+   x_pos = plg->plot_box.x;
+   y_pos = plg->plot_box.height;
 
-    if (lg_graph_debug)
-    {
-        g_print
-            ("count_major=%d, count_minor=%d, x_minor_inc=%d, x_major_inc=%d\n",
-             count_major, count_minor, x_minor_inc, x_major_inc);
-    }
+   cairo_set_line_width (plg-> graph_cr, 1.0);
 
-    seg_minor = g_new0 (GdkSegment, count_minor + 8);
-    seg_major = g_new0 (GdkSegment, count_major + 8);
-    x_pos = plg->plot_box.x;
-    y_pos = plg->plot_box.height;
-    for (x_index = 0; x_index < count_minor; x_index++)
-    {
-        seg_minor[x_index].x1 = plg->plot_box.x + (x_minor_inc * (x_index + 1));
-        seg_minor[x_index].y1 = plg->plot_box.y + 2;
-        seg_minor[x_index].x2 = seg_minor[x_index].x1;
-        seg_minor[x_index].y2 = plg->plot_box.y + y_pos;
-    }
+   for (x_index = 0; x_index < count_minor; x_index++) {
+      cairo_move_to (
+         plg->graph_cr,
+         (gdouble)(plg->plot_box.x + (x_minor_inc * (x_index + 1))), (gdouble)plg->plot_box.y);
+      cairo_line_to (
+         plg->graph_cr,
+         (gdouble)(plg->plot_box.x + (x_minor_inc * (x_index + 1))), (gdouble)(plg->plot_box.y + y_pos));
+   }
+   cairo_stroke(plg->graph_cr);
 
-    x_pos = plg->plot_box.x;
-    y_pos = plg->plot_box.height;
-    for (x_index = 0; x_index < count_major; x_index++)
-    {
-        seg_major[x_index].x1 = plg->plot_box.x + (x_major_inc * (x_index + 1));
-        seg_major[x_index].y1 = plg->plot_box.y + 2;
-        seg_major[x_index].x2 = seg_major[x_index].x1;
-        seg_major[x_index].y2 = plg->plot_box.y + y_pos;
-    }
+   cairo_set_line_width (plg-> graph_cr, 2.0);
 
-    gdk_gc_set_line_attributes (plg->window_gc,
-                                1, GDK_LINE_SOLID, GDK_CAP_BUTT, GDK_JOIN_BEVEL);
-    gdk_draw_segments (plg->pixmap, plg->window_gc, seg_minor, count_minor - 1);
+   for (x_index = 0; x_index < count_major; x_index++) {
+      cairo_move_to (
+         plg->graph_cr,
+         (gdouble)(plg->plot_box.x + (x_major_inc * (x_index + 1))), (gdouble)plg->plot_box.y);
+      cairo_line_to (
+         plg->graph_cr,
+         (gdouble)(plg->plot_box.x + (x_major_inc * (x_index + 1))), (gdouble)(plg->plot_box.y + y_pos));
+   }
+   cairo_stroke(plg->graph_cr);
 
-    gdk_gc_set_line_attributes (plg->window_gc,
-                                2, GDK_LINE_SOLID, GDK_CAP_ROUND, GDK_JOIN_BEVEL);
-    gdk_draw_segments (plg->pixmap, plg->window_gc, seg_major, count_major - 1);
-
-    g_clear_pointer (&seg_minor, g_free);
-    g_clear_pointer (&seg_major, g_free);
-
-    return TRUE;
+   return TRUE;
 }
 
 /*
@@ -846,131 +834,140 @@ static gint lg_graph_draw_grid_lines (PLGRAPH plg)
 */
 static gint lg_graph_draw_tooltip (PLGRAPH plg)
 {
-    PangoLayout *layout = NULL;
-    gint        x_pos = 0, y_pos = 0, width = 0, height = 0;
-    gint        v_index = 0, x_adj = 0;
-    PLG_SERIES  psd = NULL;
-    GList      *data_sets = NULL;
-    GdkRegion  *region = NULL;
-    gboolean    b_found = FALSE;
+   PangoLayout *layout = NULL;
+   gint        x_pos = 0, y_pos = 0, width = 0, height = 0;
+   gint        v_index = 0, x_adj = 0;
+   PLG_SERIES  psd = NULL;
+   GList      *data_sets = NULL;
+   GdkColor    color;
+   GdkRegion  *region = NULL;
+   gboolean    b_found = FALSE;
 
-    g_return_val_if_fail (plg != NULL, -1);
-    g_return_val_if_fail (gtk_widget_is_drawable(plg->drawing_area), -1);
+   g_return_val_if_fail (plg != NULL, -1);
+   g_return_val_if_fail (gtk_widget_is_drawable(plg->drawing_area), -1);
 
-    if (!plg->b_tooltip_active)
-    {
-        return -1;
-    }
-    if (plg->i_points_available < 1) {
-        return -1;
-    }
+   if (!plg->b_tooltip_active) {
+      return -1;
+   }
+   if (plg->i_points_available < 1) {
+      return -1;
+   }
 
-    /*
-     * Create tooltip if needed */
-    region = gdk_region_rectangle (&plg->plot_box);
-    x_adj = (plg->x_range.i_minor_inc / plg->x_range.i_inc_minor_scale_by);
+   /*
+    * Create tooltip if needed */
+   region = gdk_region_rectangle (&plg->plot_box);
+   x_adj = (plg->x_range.i_minor_inc / plg->x_range.i_inc_minor_scale_by);
 
-    /*
-     * see if ptr is at a x-range point */
-    if (!gdk_region_point_in (region, plg->mouse_pos.x, plg->mouse_pos.y))
-    {
-        gdk_region_destroy (region);
-        return -1;
-    }
-    gdk_region_destroy (region);
+   /*
+    * see if ptr is at a x-range point */
+   if (!gdk_region_point_in (region, plg->mouse_pos.x, plg->mouse_pos.y)) {
+      gdk_region_destroy (region);
+      return -1;
+   }
+   gdk_region_destroy (region);
 
-    for (v_index = 0; v_index <= plg->x_range.i_max_scale; v_index++)
-    {
+   for (v_index = 0; v_index <= plg->x_range.i_max_scale; v_index++) {
         x_pos = plg->plot_box.x + (v_index * x_adj);
-        if ((plg->mouse_pos.x > (x_pos - (x_adj / 3))) &&
-            (plg->mouse_pos.x < (x_pos + (x_adj / 3))))
-        {
-            if (v_index < plg->i_points_available)
-            {
-                b_found = TRUE;
-                break;
-            }
-        }
-    }
+      if ((plg->mouse_pos.x > (x_pos - (x_adj / 3))) &&
+          (plg->mouse_pos.x < (x_pos + (x_adj / 3)))) {
+         if (v_index < plg->i_points_available) {
+            b_found = TRUE;
+            break;
+         }
+      }
+   }
 
-    /*
-     * All we needed was x, so now post a tooltip */
-    if (b_found)
-    {
-        gchar       ch_buffer[GAPC_MAX_BUFFER];
-        gchar       ch_work[GAPC_MAX_BUFFER];
-        gchar       ch_time_r[GAPC_MAX_TEXT];
-        gchar      *pch_time = NULL;
-        time_t      point_time;
+   /*
+    * All we needed was x, so now post a tooltip */
+   if (b_found) {
+      gchar       ch_buffer[GAPC_MAX_BUFFER];
+      gchar       ch_work[GAPC_MAX_BUFFER];
+      gchar       ch_time_r[GAPC_MAX_TEXT];
+      gchar      *pch_time = NULL;
+      time_t      point_time;
 
-        point_time = (time_t) g_list_nth_data (plg->lg_series_time, v_index);
+      point_time = (time_t) g_list_nth_data (plg->lg_series_time, v_index);
 
-        pch_time = ctime_r (&point_time, ch_time_r);
+      pch_time = ctime_r (&point_time, ch_time_r);
 
-        g_strdelimit (pch_time, "\n", ' ');
+      g_strdelimit (pch_time, "\n", ' ');
 
-        g_snprintf (ch_buffer, sizeof (ch_buffer),
-                    "<small>{ <u>sample #%d @ %s</u>}\n", v_index, pch_time);
-        data_sets = g_list_first (plg->lg_series);
-        while (data_sets)
-        {
-            psd = data_sets->data;
-            if (psd != NULL)
-            {                   /* found */
-                g_snprintf (ch_work, sizeof (ch_work), "%s", ch_buffer);
-                g_snprintf (ch_buffer, sizeof (ch_buffer),
-                            "%s{%3.0f%% <span foreground=\"%s\">%s</span>}",
-                            ch_work,
-                            psd->lg_point_dvalue[v_index],
-                            psd->ch_legend_color, psd->ch_legend_text);
-            }
-            data_sets = g_list_next (data_sets);
-        }
+      g_snprintf (
+         ch_buffer,
+         sizeof (ch_buffer),
+         "<span size=\"x-small\"><tt>{ <u>sample #%d @ %s</u>}\n",
+         v_index, pch_time);
+      data_sets = g_list_first (plg->lg_series);
+      while (data_sets) {
+         psd = data_sets->data;
+         if (psd != NULL) {                   /* found */
+            g_snprintf (ch_work, sizeof (ch_work), "%s", ch_buffer);
+            g_snprintf (ch_buffer, sizeof (ch_buffer),
+                        "%s{%3.0f%% <span fgcolor=\"%s\">%s</span>}",
+                        ch_work,
+                        psd->lg_point_dvalue[v_index],
+                        psd->ch_legend_color, psd->ch_legend_text);
+         }
+         data_sets = g_list_next (data_sets);
+      }
+      g_snprintf (ch_work, sizeof (ch_work), "%s", ch_buffer);
+      g_snprintf (ch_buffer, sizeof (ch_buffer), "%s</tt></span>", ch_work);
+      g_snprintf (
+         plg->ch_tooltip_text,
+         sizeof (plg->ch_tooltip_text),
+         "%s",
+         ch_buffer);
+   }
+   if (!b_found) {
+      return -1;
+   }
+   layout = pango_cairo_create_layout (plg->graph_cr);
+   pango_layout_set_alignment (layout, PANGO_ALIGN_CENTER);
 
-        g_snprintf (ch_work, sizeof (ch_work), "%s", ch_buffer);
-        g_snprintf (ch_buffer, sizeof (ch_buffer), "%s</small>", ch_work);
-        g_snprintf (plg->ch_tooltip_text, sizeof (plg->ch_tooltip_text), "%s",
-                        ch_buffer);
-    }
+   pango_layout_set_markup (layout, plg->ch_tooltip_text, -1);
 
-    if (!b_found)
-    {
-        return -1;
-    }
+   pango_layout_get_pixel_size (layout, &width, &height);
 
-    layout = gtk_widget_create_pango_layout (plg->drawing_area, plg->ch_tooltip_text);
-    pango_layout_set_alignment (layout, PANGO_ALIGN_CENTER);
+   x_pos = plg->x_tooltip.x + ((plg->x_tooltip.width - width) / 2);
+   y_pos = plg->x_tooltip.y + ((plg->x_tooltip.height - height) / 2);
 
-    pango_layout_set_markup (layout, plg->ch_tooltip_text, -1);
+   gdk_color_parse (plg->ch_color_window_bg, &color);
+   gdk_cairo_set_source_color (plg->graph_cr, &color);
+   cairo_rectangle (
+      plg->graph_cr,
+      (gdouble)plg->x_tooltip.x,
+      (gdouble)plg->x_tooltip.y,
+      (gdouble)plg->x_tooltip.width,
+      (gdouble)plg->x_tooltip.height);
+   cairo_fill(plg->graph_cr);
+   gdk_color_parse (plg->ch_color_chart_bg, &color);
+   gdk_cairo_set_source_color (plg->graph_cr, &color);
+   cairo_rectangle (
+      plg->graph_cr,
+      (gdouble)plg->x_tooltip.x,
+      (gdouble)plg->x_tooltip.y,
+      (gdouble)plg->x_tooltip.width,
+      (gdouble)plg->x_tooltip.height);
+   cairo_stroke(plg->graph_cr);
+   pango_cairo_update_layout (plg->graph_cr, layout);
 
-    pango_layout_get_pixel_size (layout, &width, &height);
+   gdk_color_parse (plg->ch_color_scale_fg, &color);
+   gdk_cairo_set_source_color (plg->graph_cr, &color);
+   cairo_move_to(
+      plg->graph_cr,
+      (gdouble)x_pos,
+      (gdouble)y_pos);
+   pango_cairo_show_layout (plg->graph_cr, layout);
 
-    x_pos = plg->x_tooltip.x + ((plg->x_tooltip.width - width) / 2);
-    y_pos = plg->x_tooltip.y + ((plg->x_tooltip.height - height) / 2);
+   g_clear_object (&layout);
 
-    gdk_draw_rectangle (plg->pixmap, plg->window_gc, /* box_gc, */
-                        TRUE,
-                        plg->x_tooltip.x,
-                        plg->x_tooltip.y, plg->x_tooltip.width, plg->x_tooltip.height);
-    gdk_draw_rectangle (plg->pixmap, plg->box_gc,
-                        FALSE,
-                        plg->x_tooltip.x,
-                        plg->x_tooltip.y, plg->x_tooltip.width, plg->x_tooltip.height);
-
-    gdk_draw_layout (plg->pixmap, plg->scale_gc, x_pos, y_pos, layout);
-
-    g_object_unref (layout);
-
-    if (lg_graph_debug)
-    {
-        g_print ("DrawToolTip: x=%d, y=%d Width=%d, Height=%d, Text=%s\n",
-                 x_pos, y_pos, width, height, plg->ch_tooltip_text);
-    }
-
-    return width;
+   if (lg_graph_debug) {
+       g_print ("DrawToolTip: x=%d, y=%d Width=%d, Height=%d, Text=%s\n",
+                x_pos, y_pos, width, height, plg->ch_tooltip_text);
+   }
+   return width;
 }
 
-#if GTK_CHECK_VERSION(2,6,0)
 /*
  * Draws a label text on the Y axis
  * sets the width, height values of the input rectangle to the size of textbox
@@ -978,153 +975,71 @@ static gint lg_graph_draw_tooltip (PLGRAPH plg)
 */
 static gint lg_graph_draw_vertical_text (PLGRAPH plg,
                                          gchar * pch_text,
-                                         GdkRectangle * rect, gboolean redraw_control)
+                                         GdkRectangle * rect,
+                                         gboolean redraw_control)
 {
-    PangoRenderer *renderer = NULL;
-    PangoMatrix matrix = PANGO_MATRIX_INIT;
-    PangoContext *context = NULL;
-    PangoLayout *layout = NULL;
-    gint        y_pos = 0;
+   GdkColor              color;
+   PangoFontDescription *font_desc = NULL;
+   PangoLayout          *layout = NULL;
+   gint                  y_pos = 0;
 
-    g_return_val_if_fail (plg != NULL, -1);
-    g_return_val_if_fail (pch_text != NULL, -1);
-    g_return_val_if_fail (rect != NULL, -1);
-    g_return_val_if_fail (gtk_widget_is_drawable(plg->drawing_area), -1);
+   g_return_val_if_fail (plg != NULL, -1);
+   g_return_val_if_fail (pch_text != NULL, -1);
+   g_return_val_if_fail (rect != NULL, -1);
+   g_return_val_if_fail (gtk_widget_is_drawable(plg->drawing_area), -1);
 
-    if (rect->width && redraw_control)
-    {
-        gdk_draw_rectangle (plg->pixmap, plg->window_gc,
-                            TRUE, rect->x, rect->y, rect->width, rect->height);
-    }
+   if (rect->width && redraw_control) {
+      gdk_color_parse (plg->ch_color_window_bg, &color);
+      gdk_cairo_set_source_color (plg->graph_cr, &color);
+      cairo_rectangle (
+         plg->graph_cr,
+         (gdouble)rect->x,
+         (gdouble)rect->y,
+         (gdouble)rect->width,
+         (gdouble)rect->height);
+      cairo_fill (plg->graph_cr);
+   }
+   cairo_save(plg->graph_cr);
 
-    /* Get the default renderer for the screen, and set it up for drawing  */
-    renderer = gdk_pango_renderer_get_default (gtk_widget_get_screen (plg->drawing_area));
-    gdk_pango_renderer_set_drawable (GDK_PANGO_RENDERER (renderer), plg->pixmap);
-    gdk_pango_renderer_set_gc (GDK_PANGO_RENDERER (renderer), plg->title_gc);
+   font_desc = pango_font_description_new();
+   pango_font_description_set_family_static (font_desc, "Mono");
+   layout = pango_cairo_create_layout (plg->graph_cr);
+   pango_layout_set_font_description (layout, font_desc);
+   pango_layout_set_markup (layout, pch_text, -1);
+   pango_layout_set_alignment (layout, PANGO_ALIGN_CENTER);
 
-    context = gtk_widget_get_pango_context (plg->drawing_area);
+   pango_layout_get_pixel_size (layout, &rect->width, &rect->height);
+   y_pos = rect->y + plg->plot_box.height - ((plg->plot_box.height - rect->width) / 2);
 
-    layout = pango_layout_new (context);
-    pango_layout_set_markup (layout, pch_text, -1);
+   gdk_color_parse (plg->ch_color_title_fg, &color);
+   gdk_cairo_set_source_color (plg->graph_cr, &color);
+   cairo_move_to (
+      plg->graph_cr,
+      0.0,
+      (gdouble)y_pos);
+   cairo_rotate(plg->graph_cr, -G_PI / 2.0);
+   pango_cairo_update_layout (plg->graph_cr, layout);
+   pango_cairo_show_layout (plg->graph_cr, layout);
 
-    pango_matrix_rotate (&matrix, 90.0);
-    pango_context_set_matrix (context, &matrix);
+   /* free the objects we created */
+   g_clear_object (&layout);
+   g_clear_pointer (&font_desc, pango_font_description_free);
 
-    pango_layout_context_changed (layout);
+   cairo_restore(plg->graph_cr);
 
-                             /* xy switched due to rotate func */
-    pango_layout_get_pixel_size (layout, &rect->height, &rect->width);
-    y_pos = rect->y + ((plg->plot_box.height - rect->height) / 2);
+   if (lg_graph_debug) {
+      g_print ("Vertical Label: x=%d, y=%d Width=%d, Height=%d Text:%s\n",
+               rect->x, rect->y, rect->width, rect->height, pch_text);
+   }
+   if (redraw_control) {
+      GdkRegion  *region = NULL;
 
-    gdk_draw_layout (plg->pixmap, plg->title_gc, rect->x, y_pos, layout);
-
-    /* Clean up default renderer, since it is shared */
-    gdk_pango_renderer_set_drawable (GDK_PANGO_RENDERER (renderer), NULL);
-    gdk_pango_renderer_set_gc (GDK_PANGO_RENDERER (renderer), NULL);
-    pango_context_set_matrix (context, NULL);
-
-    /* free the objects we created */
-    g_object_unref (layout);
-
-    if (lg_graph_debug)
-    {
-        g_print ("Vertical Label: x=%d, y=%d Width=%d, Height=%d Text:%s\n",
-                 rect->x, rect->y, rect->width, rect->height, pch_text);
-    }
-
-    if (redraw_control)
-    {
-        GdkRegion  *region = NULL;
-
-        region = gdk_region_rectangle (rect);
-        gdk_window_invalidate_region (plg->drawing_area->window, region, FALSE);
-        gdk_region_destroy (region);
-    }
-
-    return rect->height;
+      region = gdk_region_rectangle (rect);
+      gdk_window_invalidate_region (plg->drawing_area->window, region, FALSE);
+      gdk_region_destroy (region);
+   }
+   return rect->height;
 }
-#else
-static gint lg_graph_draw_vertical_text (PLGRAPH plg,
-                                         gchar * pch_text,
-                                         GdkRectangle * rect, gboolean redraw_control)
-{
-    PangoContext *context = NULL;
-    PangoLayout *layout = NULL;
-    gint        y_pos = 0;
-    GdkPixmap      *norm_pixmap = NULL;
-    gint            width, height;
-    gint            rot_width, rot_height;
-    GdkPixbuf      *norm_pixbuf = NULL, *rot_pixbuf = NULL;
-    guint32        *norm_pix, *rot_pix;
-    gint            i, j, k, l;
-
-    g_return_val_if_fail (plg != NULL, -1);
-    g_return_val_if_fail (pch_text != NULL, -1);
-    g_return_val_if_fail (rect != NULL, -1);
-  g_return_val_if_fail (gtk_widget_is_drawable(plg->drawing_area), -1);
-
-
-  context = gtk_widget_get_pango_context (plg->drawing_area);
-  layout = pango_layout_new (context);
-  pango_layout_set_markup (layout, pch_text, -1);
-  pango_layout_get_pixel_size (layout, &width, &height);
-  if (width <= 0 || height <= 0)
-  {
-    return 0;
-  }
-
-  /* Figure out the rotated width and height */
-  rect->width  = rot_width = height;
-  rect->height = rot_height = width;
-
-  norm_pixmap = gdk_pixmap_new (plg->drawing_area->window, width, height, -1);
-  gdk_draw_rectangle (norm_pixmap, plg->window_gc, TRUE, 0, 0, width, height);
-  gdk_draw_layout (norm_pixmap, plg->title_gc, 0, 0, layout);
-
-  norm_pixbuf = gdk_pixbuf_new (GDK_COLORSPACE_RGB, TRUE, 8, width, height);
-  norm_pixbuf = gdk_pixbuf_get_from_drawable (norm_pixbuf, norm_pixmap, NULL,
-                                              0, 0, 0, 0, width, height);
-
-  /* Get the raw pixel pointer of client buffer */
-  norm_pix = (guint32 *) gdk_pixbuf_get_pixels (norm_pixbuf);
-
-  /* Allocate a new client buffer with rotated memory */
-  rot_pixbuf = gdk_pixbuf_new (GDK_COLORSPACE_RGB, TRUE, 8, rot_width, rot_height);
-  rot_pix = (guint32 *) gdk_pixbuf_get_pixels (rot_pixbuf);
-
-  /* Actually rotate */
-  k = 0;
-  for (j = width - 1; j >= 0; j--)
-  {
-       l = j;
-       for (i = 0; i < height; i++, k++, l += width)
-       {
-          rot_pix[k] = norm_pix[l];
-       }
-  }
-
-  /* compute a centered position on chart */
-  y_pos = rect->y + ((plg->plot_box.height - rect->height) / 2);
-
-  /* Draw it to the chart */
-  gdk_pixbuf_render_to_drawable ( rot_pixbuf,
-                        plg->pixmap,
-                        plg->title_gc,
-                        0, 0,
-                        rect->x -1, y_pos,
-                        rect->width, rect->height,
-                        GDK_RGB_DITHER_NONE, 0, 0);
-
-  /* Free everything */
-  g_object_unref (layout);
-  g_object_unref (G_OBJECT (norm_pixmap));
-  g_object_unref (G_OBJECT (norm_pixbuf));
-  g_object_unref (G_OBJECT (rot_pixbuf));
-
-
-  return rect->height;
-}
-#endif
 
 /*
  * Draws a label text on the X axis
@@ -1134,50 +1049,65 @@ static gint lg_graph_draw_vertical_text (PLGRAPH plg,
 */
 static gint lg_graph_draw_horizontal_text (PLGRAPH plg,
                                            gchar * pch_text,
-                                           GdkRectangle * rect, gboolean redraw_control)
+                                           GdkRectangle * rect,
+                                           gboolean redraw_control)
 {
-    PangoLayout *layout = NULL;
-    gint        x_pos = 0;
+   GdkColor              color;
+   PangoFontDescription *font_desc = NULL;
+   PangoLayout          *layout = NULL;
+   gint                 x_pos = 0;
 
-    g_return_val_if_fail (plg != NULL, -1);
-    g_return_val_if_fail (pch_text != NULL, -1);
-    g_return_val_if_fail (rect != NULL, -1);
-    g_return_val_if_fail (gtk_widget_is_drawable(plg->drawing_area), -1);
+   g_return_val_if_fail (plg != NULL, -1);
+   g_return_val_if_fail (pch_text != NULL, -1);
+   g_return_val_if_fail (rect != NULL, -1);
+   g_return_val_if_fail (gtk_widget_is_drawable(plg->drawing_area), -1);
 
-    if (rect->width && redraw_control)
-    {
-        gdk_draw_rectangle (plg->pixmap, plg->window_gc,
-                            TRUE, rect->x, rect->y, rect->width, rect->height);
-    }
+   if (rect->width && redraw_control) {
+      gdk_color_parse (plg->ch_color_window_bg, &color);
+      gdk_cairo_set_source_color (plg->graph_cr, &color);
+      cairo_rectangle (
+         plg->graph_cr,
+         (gdouble)rect->x,
+         (gdouble)rect->y,
+         (gdouble)rect->width,
+         (gdouble)rect->height);
+      cairo_fill (plg->graph_cr);
+   }
+   font_desc = pango_font_description_new();
+   pango_font_description_set_family_static (font_desc, "Mono");
+   layout = pango_cairo_create_layout (plg->graph_cr);
+   pango_layout_set_font_description (layout, font_desc);
+   pango_layout_set_markup (layout, pch_text, -1);
+   pango_layout_set_alignment (layout, PANGO_ALIGN_CENTER);
+   pango_layout_get_pixel_size (layout, &rect->width, &rect->height);
+   pango_cairo_update_layout (plg->graph_cr, layout);
 
-    layout = gtk_widget_create_pango_layout (plg->drawing_area, pch_text);
-    pango_layout_set_markup (layout, pch_text, -1);
-    pango_layout_set_alignment (layout, PANGO_ALIGN_CENTER);
+   x_pos = rect->x + ((plg->plot_box.width - rect->width) / 2);
 
-    pango_layout_get_pixel_size (layout, &rect->width, &rect->height);
-    x_pos = rect->x + ((plg->plot_box.width - rect->width) / 2);
+   gdk_color_parse (plg->ch_color_title_fg, &color);
+   gdk_cairo_set_source_color (plg->graph_cr, &color);
+   cairo_move_to (
+      plg->graph_cr,
+      (gdouble)x_pos,
+      (gdouble)rect->y);
+   pango_cairo_show_layout (plg->graph_cr, layout);
 
-    gdk_draw_layout (plg->pixmap, plg->title_gc, x_pos, rect->y, layout);
+   g_clear_object (&layout);
+   g_clear_pointer (&font_desc, pango_font_description_free);
 
-    g_object_unref (layout);
+   if (lg_graph_debug) {
+      g_print ("Horizontal Label: x=%d, y=%d Width=%d, Height=%d Text:%s\n",
+               x_pos, rect->y, rect->width, rect->height, pch_text);
 
-    if (lg_graph_debug)
-    {
-        g_print ("Horizontal Label: x=%d, y=%d Width=%d, Height=%d Text:%s\n",
-                 x_pos, rect->y, rect->width, rect->height, pch_text);
+   }
+   if (redraw_control) {
+      GdkRegion  *region = NULL;
 
-    }
-
-    if (redraw_control)
-    {
-        GdkRegion  *region = NULL;
-
-        region = gdk_region_rectangle (rect);
-        gdk_window_invalidate_region (plg->drawing_area->window, region, FALSE);
-        gdk_region_destroy (region);
-    }
-
-    return rect->width;
+      region = gdk_region_rectangle (rect);
+      gdk_window_invalidate_region (plg->drawing_area->window, region, FALSE);
+      gdk_region_destroy (region);
+   }
+   return rect->width;
 }
 
 /*
@@ -1195,7 +1125,7 @@ static void lg_graph_get_default_sizes (PLGRAPH plg, gint * width, gint * height
 
     pango_layout_get_pixel_size (layout, width, height);
 
-    g_object_unref (layout);
+    g_clear_object(&layout);
 
     if (lg_graph_debug)
     {
@@ -1243,75 +1173,88 @@ static void lg_graph_set_ranges (PLGRAPH plg,
  */
 static gboolean lg_graph_draw (PLGRAPH plg)
 {
-    GtkWidget  *drawing_area = NULL;
+   GdkColor color;
+   GtkWidget  *drawing_area = NULL;
+   cairo_t *graph_cr = NULL;
 
-    g_return_val_if_fail (plg != NULL, G_SOURCE_CONTINUE);
+   g_return_val_if_fail (plg != NULL, G_SOURCE_CONTINUE);
 
-    drawing_area = plg->drawing_area;
+   drawing_area = plg->drawing_area;
 
-    if ( !(gtk_widget_is_drawable(drawing_area)) ) {
-        return G_SOURCE_CONTINUE;
-    }
+   if ( !(gtk_widget_is_drawable(drawing_area)) ) {
+      return G_SOURCE_CONTINUE;
+   }
+   graph_cr = plg->graph_cr;
 
-    /*
-     * Clear the whole area
-     */
-    gdk_draw_rectangle (plg->pixmap, plg->window_gc,
-                        TRUE, 0, 0,
-                        plg->drawing_area->allocation.width,
-                        plg->drawing_area->allocation.height);
+   /*
+    * Clear the whole area
+    */
+   gdk_color_parse (plg->ch_color_window_bg, &color);
+   gdk_cairo_set_source_color (graph_cr, &color);
+   cairo_rectangle (
+      graph_cr,
+      0.0,
+      0.0,
+      (gdouble)plg->drawing_area->allocation.width,
+      (gdouble)plg->drawing_area->allocation.height);
+   cairo_fill (graph_cr);
 
-    /*
-     * draw plot area
-     */
-    gdk_draw_rectangle (plg->pixmap,
-                        plg->box_gc,
-                        TRUE,
-                        plg->plot_box.x,
-                        plg->plot_box.y, plg->plot_box.width, plg->plot_box.height);
+   /*
+    * draw plot area
+    */
+   gdk_color_parse (plg->ch_color_chart_bg, &color);
+   gdk_cairo_set_source_color (graph_cr, &color);
+   cairo_rectangle (
+      graph_cr,
+      (gdouble)plg->plot_box.x,
+      (gdouble)plg->plot_box.y,
+      (gdouble)plg->plot_box.width,
+      (gdouble)plg->plot_box.height);
+   cairo_fill ( graph_cr);
 
-    gdk_gc_set_line_attributes (plg->drawing_area->style->black_gc,
-                                2, GDK_LINE_SOLID, GDK_CAP_BUTT, GDK_JOIN_BEVEL);
-    gdk_draw_rectangle (plg->pixmap,
-                        plg->drawing_area->style->black_gc,
-                        FALSE,
-                        plg->plot_box.x,
-                        plg->plot_box.y, plg->plot_box.width, plg->plot_box.height);
+   lg_graph_draw_grid_lines (plg);
 
-    if (lg_graph_debug)
-    {
-        g_print
-            ("Window: Width=%d, Height=%d, Plot Area x=%d y=%d width=%d, height=%d\n",
-             drawing_area->allocation.width, drawing_area->allocation.height,
-             plg->plot_box.x, plg->plot_box.y, plg->plot_box.width, plg->plot_box.height);
-    }
+   cairo_set_line_cap (graph_cr, CAIRO_LINE_CAP_SQUARE);
+   cairo_set_source_rgb (graph_cr, 0.0, 0.0, 0.0);
+   cairo_rectangle (
+      graph_cr,
+      (gdouble)plg->plot_box.x,
+      (gdouble)plg->plot_box.y,
+      (gdouble)plg->plot_box.width,
+      (gdouble)plg->plot_box.height);
+   cairo_stroke (graph_cr);
 
-    /*
-     * draw titles
-     */
-    lg_graph_draw_horizontal_text (plg, plg->x_title_text, &plg->x_title, FALSE);
+   if (lg_graph_debug) {
+      g_print(
+         "Window: Width=%d, Height=%d, Plot Area x=%d y=%d width=%d, height=%d\n",
+         drawing_area->allocation.width, drawing_area->allocation.height,
+         plg->plot_box.x, plg->plot_box.y, plg->plot_box.width, plg->plot_box.height);
+   }
 
-    lg_graph_draw_horizontal_text (plg, plg->x_label_text, &plg->x_label, FALSE);
+   /*
+    * draw titles
+    */
+   lg_graph_draw_horizontal_text (plg, plg->x_title_text, &plg->x_title, FALSE);
 
-    lg_graph_draw_vertical_text (plg, plg->y_label_text, &plg->y_label, FALSE);
+   lg_graph_draw_horizontal_text (plg, plg->x_label_text, &plg->x_label, FALSE);
 
-    lg_graph_draw_grid_lines (plg);
+   lg_graph_draw_vertical_text (plg, plg->y_label_text, &plg->y_label, FALSE);
 
-    lg_graph_draw_x_grid_labels (plg);
+   lg_graph_draw_x_grid_labels (plg);
 
-    lg_graph_draw_y_grid_labels (plg);
+   lg_graph_draw_y_grid_labels (plg);
 
-    lg_graph_data_series_draw_all (plg, FALSE);
+   lg_graph_data_series_draw_all (plg, FALSE);
 
-    lg_graph_draw_tooltip (plg);
+   lg_graph_draw_tooltip (plg);
 
-    /* The entire pixmap is going to be copied
-     *     onto the window so the rect is configured
-     *     as the size of the window.
-     */
-    lg_graph_redraw (plg);
+   /* The entire pixmap is going to be copied
+    *     onto the window so the rect is configured
+    *     as the size of the window.
+    */
+   lg_graph_redraw (plg);
 
-    return G_SOURCE_REMOVE;
+   return G_SOURCE_REMOVE;
 }
 
 static gboolean gapc_timeout_drawing_area_configure(PLGRAPH plg)
@@ -1333,84 +1276,100 @@ static gboolean gapc_timeout_drawing_area_configure(PLGRAPH plg)
  * resized.  We have to free up things we allocated.
  */
 static gboolean lg_graph_configure_event_cb (GtkWidget * widget,
-                                             GdkEventConfigure * event, PLGRAPH plg)
+                                             GdkEventConfigure * event,
+                                             PLGRAPH plg)
 {
-    GdkRectangle clip_area;
-    gint        xfactor = 0, yfactor = 0;
+   GdkColor     color;
+   GdkRectangle clip_area;
+   gint         xfactor = 0;
+   gint         yfactor = 0;
 
-    /* --- Free background if we created it --- */
-    if (plg->pixmap)
-    {
-        gdk_pixmap_unref (plg->pixmap);
-    }
+   /* --- Free background if we created it --- */
+   if (plg->pixmap) {
+      g_clear_object(&plg->pixmap);
+   }
 
-    /* --- Create a new pixmap with new size --- */
-    plg->pixmap = gdk_pixmap_new (widget->window,
-                                  widget->allocation.width,
-                                  widget->allocation.height, -1);
+   /* --- Create a new pixmap with new size --- */
+   plg->pixmap = gdk_pixmap_new (widget->window,
+                                 widget->allocation.width,
+                                 widget->allocation.height, -1);
 
-    gdk_draw_rectangle (plg->pixmap, plg->window_gc,
-                        TRUE, 0, 0, widget->allocation.width, widget->allocation.height);
+   if (plg->graph_cr != NULL) {
+      g_clear_pointer(&plg->graph_cr, cairo_destroy);
+   }
+   plg->graph_cr = gdk_cairo_create (plg->pixmap);
+   cairo_set_antialias (plg->graph_cr, CAIRO_ANTIALIAS_FAST);
+   cairo_set_line_cap (plg->graph_cr, CAIRO_LINE_CAP_SQUARE);
 
-    plg->width = widget->allocation.width;
-    plg->height = widget->allocation.height;
+   gdk_color_parse (plg->ch_color_window_bg, &color);
+   gdk_cairo_set_source_color (plg->graph_cr, &color);
+   cairo_rectangle (
+      plg->graph_cr,
+      0.0,
+      0.0,
+      (gdouble)widget->allocation.width,
+      (gdouble)widget->allocation.height);
+   cairo_fill(plg->graph_cr);
 
-    clip_area.x = 0;
-    clip_area.y = 0;
-    clip_area.width = widget->allocation.width;
-    clip_area.height = widget->allocation.height;
+   plg->width = widget->allocation.width;
+   plg->height = widget->allocation.height;
 
-    xfactor = MAX (plg->x_range.i_num_minor, plg->x_range.i_num_major);
-    yfactor = MAX (plg->y_range.i_num_minor, plg->y_range.i_num_major);
+   clip_area.x = 0;
+   clip_area.y = 0;
+   clip_area.width = widget->allocation.width;
+   clip_area.height = widget->allocation.height;
 
-    lg_graph_get_default_sizes (plg, &plg->x_border, &plg->y_border);
-    plg->x_border /= 4;
-    plg->y_border /= 4;
+   xfactor = MAX (plg->x_range.i_num_minor, plg->x_range.i_num_major);
+   yfactor = MAX (plg->y_range.i_num_minor, plg->y_range.i_num_major);
 
-    plg->x_label.x = plg->x_border * 6; /* define top-left corner of textbox */
-    plg->x_label.y = plg->height - (plg->y_border * 4) + 2;
+   lg_graph_get_default_sizes (plg, &plg->x_border, &plg->y_border);
+   plg->x_border /= 4;
+   plg->y_border /= 4;
 
-    plg->y_label.x = plg->x_border;
-    plg->y_label.y = plg->y_border * 6;
+   plg->x_label.x = plg->x_border * 6; /* define top-left corner of textbox */
+   plg->x_label.y = plg->height - (plg->y_border * 4) + 2;
 
-    plg->x_title.x = plg->x_border * 6;
-    plg->x_title.y = 1;         /* /plg->y_border ; */
+   plg->y_label.x = plg->x_border;
+   plg->y_label.y = plg->y_border * 6;
 
-    plg->x_tooltip.x = plg->x_border;
-    plg->x_tooltip.y = plg->y_border;
-    plg->x_tooltip.width = plg->width - (plg->x_border * 2);
-    plg->x_tooltip.height = plg->y_border * 7;
+   plg->x_title.x = plg->x_border * 6;
+   plg->x_title.y = 1;         /* /plg->y_border ; */
 
-    plg->plot_box.x = plg->x_border * 6;
-    plg->plot_box.y = plg->y_border * 6;
-    plg->plot_box.width =
-        ((gint) (plg->width - (plg->x_border * 10)) / xfactor) * xfactor;
-    plg->plot_box.height =
-        ((gint) (plg->height - (plg->y_border * 14)) / yfactor) * yfactor;
+   plg->x_tooltip.x = plg->x_border;
+   plg->x_tooltip.y = plg->y_border;
+   plg->x_tooltip.width = plg->width - (plg->x_border * 2);
+   plg->x_tooltip.height = plg->y_border * 7;
 
-    /* reposition the box according to scale-able increments */
-    plg->plot_box.x = (((gfloat) (plg->width - plg->plot_box.width) / 10.0) * 7) + 4;
-    plg->plot_box.y = (((gfloat) (plg->height - plg->plot_box.height) / 10.0) * 5) + 4;
-    plg->x_label.x = plg->x_title.x = plg->plot_box.x;
-    plg->y_label.y = plg->plot_box.y;
+   plg->plot_box.x = plg->x_border * 6;
+   plg->plot_box.y = plg->y_border * 6;
+   plg->plot_box.width =
+       ((gint) (plg->width - (plg->x_border * 10)) / xfactor) * xfactor;
+   plg->plot_box.height =
+       ((gint) (plg->height - (plg->y_border * 14)) / yfactor) * yfactor;
 
-    plg->y_range.i_minor_inc = plg->plot_box.height / plg->y_range.i_num_minor;
-    plg->y_range.i_major_inc = plg->plot_box.height / plg->y_range.i_num_major;
+   /* reposition the box according to scale-able increments */
+   plg->plot_box.x = (((gfloat) (plg->width - plg->plot_box.width) / 10.0) * 7) + 4;
+   plg->plot_box.y = (((gfloat) (plg->height - plg->plot_box.height) / 10.0) * 5) + 4;
+   plg->x_label.x = plg->x_title.x = plg->plot_box.x;
+   plg->y_label.y = plg->plot_box.y;
 
-    plg->x_range.i_minor_inc = plg->plot_box.width / plg->x_range.i_num_minor;
-    plg->x_range.i_major_inc = plg->plot_box.width / plg->x_range.i_num_major;
+   plg->y_range.i_minor_inc = plg->plot_box.height / plg->y_range.i_num_minor;
+   plg->y_range.i_major_inc = plg->plot_box.height / plg->y_range.i_num_major;
 
-    if (plg->tid_configure != 0) {
-       if (g_source_remove(plg->tid_configure)) {
-          plg->tid_configure = 0;
-       }
-    }
-    plg->tid_configure = g_timeout_add(
-       250,
-       G_SOURCE_FUNC(gapc_timeout_drawing_area_configure),
-       plg);
+   plg->x_range.i_minor_inc = plg->plot_box.width / plg->x_range.i_num_minor;
+   plg->x_range.i_major_inc = plg->plot_box.width / plg->x_range.i_num_major;
 
-    return TRUE;
+   if (plg->tid_configure != 0) {
+      if (g_source_remove(plg->tid_configure)) {
+         plg->tid_configure = 0;
+      }
+   }
+   plg->tid_configure = g_timeout_add(
+      250,
+      G_SOURCE_FUNC(gapc_timeout_drawing_area_configure),
+      plg);
+
+   return TRUE;
 }
 
 /*
@@ -1424,17 +1383,24 @@ static gboolean lg_graph_configure_event_cb (GtkWidget * widget,
 static gint lg_graph_expose_event_cb (GtkWidget * widget, GdkEventExpose * event,
                                       PLGRAPH plg)
 {
+   g_return_val_if_fail (GDK_IS_DRAWABLE (widget->window), FALSE);
 
-    g_return_val_if_fail (GDK_IS_DRAWABLE (widget->window), FALSE);
+   /* --- Copy pixmap to the window --- */
+   cairo_t *drawing_area_cr = gdk_cairo_create (gtk_widget_get_window (widget));
+   gdk_cairo_set_source_pixmap (
+      drawing_area_cr,
+      plg->pixmap,
+      0.0,
+      0.0);
+   cairo_rectangle (
+      drawing_area_cr,
+      event->area.x, event->area.y,
+      event->area.width, event->area.height);
+   cairo_clip (drawing_area_cr);
+   cairo_paint (drawing_area_cr);
+   g_clear_pointer (&drawing_area_cr, cairo_destroy);
 
-    /* --- Copy pixmap to the window --- */
-    gdk_draw_pixmap (widget->window,
-                     widget->style->fg_gc[gtk_widget_get_state(widget)],
-                     plg->pixmap,
-                     event->area.x, event->area.y,
-                     event->area.x, event->area.y, event->area.width, event->area.height);
-
-    return FALSE;
+   return FALSE;
 }
 
 static void cb_util_popup_menu_response_exit(GtkWidget * widget, gpointer gp)
@@ -1534,7 +1500,7 @@ static gint gapc_util_change_icons(PGAPC_MONITOR pm)
          scaled = gdk_pixbuf_scale_simple(pixbuf, size, size, GDK_INTERP_BILINEAR);
          gtk_image_set_from_pixbuf(GTK_IMAGE(pm->tray_image), scaled);
          gtk_widget_show(pm->tray_image);
-         gdk_pixbuf_unref(scaled);
+         g_clear_object(&scaled);
       }
 
       if (pm->window != NULL)
@@ -1579,7 +1545,7 @@ static gboolean cb_util_line_chart_refresh_control(PGAPC_MONITOR pm)
       &pm->phs);
 
    pch = g_strdup_printf(
-                 "<i>sampled every %3.1f seconds</i>",
+                 "<span size=\"small\"><i>sampled every %3.1f seconds</i></span>",
                  pm->phs.d_xinc);
    lg_graph_set_x_label_text (pm->phs.plg, pch);
 
@@ -1908,13 +1874,13 @@ static gboolean gapc_monitor_update_tooltip_msg(PGAPC_MONITOR pm)
    }
 
    if (b_flag) {
-      ptitle = g_strdup_printf("<span foreground=\"red\" size=\"large\">"
+      ptitle = g_strdup_printf("<span fgcolor=\"red\" size=\"medium\">"
          "%s@%s\nis %s%s" "</span>",
          (pch1 != NULL) ? pch1 : "unknown",
          (pch2 != NULL) ? pch2 : "unknown",
          (pch3 != NULL) ? pch3 : "n/a", (pchx != NULL) ? pchx : " ");
    } else {
-      ptitle = g_strdup_printf("<span foreground=\"blue\" size=\"large\">"
+      ptitle = g_strdup_printf("<span fgcolor=\"blue\" size=\"medium\">"
          "%s@%s\nis %s%s" "</span>",
          (pch1 != NULL) ? pch1 : "unknown",
          (pch2 != NULL) ? pch2 : "unknown",
@@ -1953,20 +1919,20 @@ static gboolean gapc_monitor_update_tooltip_msg(PGAPC_MONITOR pm)
 
    switch (pm->i_icon_index) {
    case GAPC_ICON_NETWORKERROR:
-      pmview = g_strdup_printf("<span foreground=\"red\" size=\"large\">"
+      pmview = g_strdup_printf("<span fgcolor=\"red\" size=\"large\">"
          "<b><i>%s@%s</i></b></span>\n"
          "NIS network connection not Responding!",
          (pch1 != NULL) ? pch1 : "unknown", (pch2 != NULL) ? pch2 : "unknown");
       break;
    case GAPC_ICON_UNPLUGGED:
-      pmview = g_strdup_printf("<span foreground=\"red\" size=\"large\">"
+      pmview = g_strdup_printf("<span fgcolor=\"red\" size=\"large\">"
          "<b><i>%s@%s</i></b></span>\n"
          "%s",
          (pch1 != NULL) ? pch1 : "unknown",
          (pch2 != NULL) ? pch2 : "unknown", (pchx != NULL) ? pchx : " un-plugged");
       break;
    case GAPC_ICON_CHARGING:
-      pmview = g_strdup_printf("<span foreground=\"blue\">"
+      pmview = g_strdup_printf("<span fgcolor=\"blue\">"
          "<b><i>%s@%s</i></b></span>\n"
          "%s Outage, Last on %s\n"
          "%s VAC, %s Charge\n"
@@ -1982,7 +1948,7 @@ static gboolean gapc_monitor_update_tooltip_msg(PGAPC_MONITOR pm)
          d_watt, pm->i_watt);
       break;
    case GAPC_ICON_ONBATT:
-      pmview = g_strdup_printf("<span foreground=\"yellow\">"
+      pmview = g_strdup_printf("<span fgcolor=\"yellow\">"
          "<b><i>%s@%s</i></b></span>\n"
          "%s Outage, Last on %s\n"
          "%s Charge, %s total on battery\n"
@@ -2190,7 +2156,7 @@ static gint gapc_monitor_update(PGAPC_MONITOR pm)
    pch4 = g_hash_table_lookup(pm->pht_Status, "STARTTIME");
    pch5 = g_hash_table_lookup(pm->pht_Status, "STATUS");
    g_snprintf(ch_buffer, sizeof(ch_buffer),
-      "<span foreground=\"blue\">" "%s\n%s\n%s\n%s\n%s\n%s" "</span>",
+      "<span fgcolor=\"blue\">" "%s\n%s\n%s\n%s\n%s\n%s" "</span>",
       (pch != NULL) ? pch : "N/A", (pch1 != NULL) ? pch1 : "N/A",
       (pch2 != NULL) ? pch2 : "N/A", (pch3 != NULL) ? pch3 : "N/A",
       (pch4 != NULL) ? pch4 : "N/A", (pch5 != NULL) ? pch5 : "N/A");
@@ -2205,7 +2171,7 @@ static gint gapc_monitor_update(PGAPC_MONITOR pm)
    pch5 = g_hash_table_lookup(pm->pht_Status, "TONBATT");
    pch6 = g_hash_table_lookup(pm->pht_Status, "CUMONBATT");
    g_snprintf(ch_buffer, sizeof(ch_buffer),
-      "<span foreground=\"blue\">" "%s\n%s\n%s\n%s\n%s\n%s\n%s" "</span>",
+      "<span fgcolor=\"blue\">" "%s\n%s\n%s\n%s\n%s\n%s\n%s" "</span>",
       (pch != NULL) ? pch : "N/A", (pch1 != NULL) ? pch1 : "N/A",
       (pch2 != NULL) ? pch2 : "N/A", (pch3 != NULL) ? pch3 : "N/A",
       (pch4 != NULL) ? pch4 : "N/A", (pch5 != NULL) ? pch5 : "N/A",
@@ -2226,7 +2192,7 @@ static gint gapc_monitor_update(PGAPC_MONITOR pm)
     d_watt = d_loadpct * pm->i_watt;
    }
    g_snprintf(ch_buffer, sizeof(ch_buffer),
-      "<span foreground=\"blue\">" "%s\n%s\n%s\n%s\n%s\n%3.0f of %d" "</span>",
+      "<span fgcolor=\"blue\">" "%s\n%s\n%s\n%s\n%s\n%3.0f of %d" "</span>",
       (pch != NULL) ? pch : "N/A", (pch1 != NULL) ? pch1 : "N/A",
       (pch2 != NULL) ? pch2 : "N/A", (pch3 != NULL) ? pch3 : "N/A",
       (pch4 != NULL) ? pch4 : "N/A", d_watt, pm->i_watt);
@@ -2941,7 +2907,7 @@ static void gapc_util_log_app_msg(gchar * pch_func, gchar * pch_topic,
 
    pch = g_strdup_printf("%s(%s) emsg=%s", pch_func, pch_topic, pch_emsg);
 
-   g_message(pch);
+   g_message("%s", pch);
 
    g_clear_pointer(&pch, g_free);
 
@@ -3008,14 +2974,28 @@ static gboolean cb_util_barchart_handle_exposed(GtkWidget * widget,
       (gdouble) (pbar->d_value * 100.0));
 
    /* the frame of the chart */
-   gtk_paint_box(widget->style, widget->window, gtk_widget_get_state(widget),
-      GTK_SHADOW_ETCHED_IN, &pbar->rect, widget, "gapc_hbar_frame", 0, 0,
+   gtk_paint_box(
+      widget->style,
+      widget->window,
+      gtk_widget_get_state(widget),
+      GTK_SHADOW_ETCHED_IN,
+      &pbar->rect,
+      widget,
+      "gapc_hbar_frame",
+      0, 0,
       widget->allocation.width - 1, widget->allocation.height - 1);
 
    /* the scaled value */
-   gtk_paint_box(widget->style, widget->window, GTK_STATE_ACTIVE, GTK_SHADOW_OUT,
-      &pbar->rect, widget, "gapc_hbar_value", 1, 1, i_percent,
-      widget->allocation.height - 4);
+   gtk_paint_box(
+      widget->style,
+      widget->window,
+      GTK_STATE_ACTIVE,
+      GTK_SHADOW_OUT,
+      &pbar->rect,
+      widget,
+      "gapc_hbar_value",
+      1, 1,
+      i_percent, widget->allocation.height - 4);
 
    if (pbar->c_text[0]) {
       gint x = 0, y = 0;
@@ -3031,7 +3011,7 @@ static gboolean cb_util_barchart_handle_exposed(GtkWidget * widget,
          &pbar->rect, widget, "gapc_hbar_text",
          (pbar->b_center_text) ? x : 6, y, playout);
 
-      g_object_unref(playout);
+      g_clear_object(&playout);
    }
 
    return TRUE;
@@ -3045,9 +3025,10 @@ static gboolean cb_util_barchart_handle_exposed(GtkWidget * widget,
 static GtkWidget *gapc_util_barchart_create(PGAPC_MONITOR pm, GtkWidget * vbox,
    gchar * pch_hbar_name, gdouble d_percent, gchar * pch_text)
 {
-   PGAPC_BAR_H pbar = NULL;
-   GtkWidget *drawing_area = NULL;
-   gchar *pch = NULL;
+   GdkColor     color;
+   PGAPC_BAR_H  pbar = NULL;
+   GtkWidget   *drawing_area = NULL;
+   gchar       *pch = NULL;
 
    g_return_val_if_fail(pm != NULL, NULL);
 
@@ -3057,6 +3038,9 @@ static GtkWidget *gapc_util_barchart_create(PGAPC_MONITOR pm, GtkWidget * vbox,
    g_strlcpy(pbar->c_text, pch_text, sizeof(pbar->c_text));
 
    drawing_area = gtk_drawing_area_new();       /* manual bargraph */
+   gtk_widget_set_name(drawing_area, pch_hbar_name);
+   gdk_color_parse("#aeaeae", &color); // XXX TODO revisit on GTK 3
+   gtk_widget_modify_bg(drawing_area, GTK_STATE_ACTIVE, &color);
    gtk_widget_set_size_request(drawing_area, 100, 20);
    g_signal_connect(G_OBJECT(drawing_area), "expose_event",
       G_CALLBACK(cb_util_barchart_handle_exposed), (gpointer) pbar);
@@ -4110,7 +4094,7 @@ static gboolean gapc_util_load_icons(PGAPC_CONFIG pcfg)
           pcfg->my_icons[x] =
              gdk_pixbuf_scale_simple(pixbuf, GAPC_ICON_SIZE, GAPC_ICON_SIZE,
              GDK_INTERP_BILINEAR);
-          g_object_unref(pixbuf);
+          g_clear_object(&pixbuf);
        }
     }
     g_clear_pointer (&pch_4, g_free);
@@ -4186,8 +4170,8 @@ static gint gapc_panel_monitor_list_page(PGAPC_CONFIG pcfg, GtkNotebook * notebo
    i_page = gtk_notebook_append_page(notebook, frame, label);
    gtk_widget_show(frame);
 
-   label = gtk_label_new("<span foreground=\"blue\">"
-      "<i>double-click a row to popup information window.</i>" "</span>");
+   label = gtk_label_new("<span fgcolor=\"blue\">"
+      "<i>Double-click a row to pop up information window.</i>" "</span>");
    gtk_label_set_use_markup(GTK_LABEL(label), TRUE);
    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_CENTER);
 
@@ -4254,8 +4238,8 @@ static gint gapc_panel_preferences_page(PGAPC_CONFIG pcfg, GtkNotebook * noteboo
    i_page = gtk_notebook_append_page(notebook, frame, label);
    gtk_widget_show(frame);
 
-   label = gtk_label_new("<span foreground=\"blue\">"
-      "<i>double-click a columns value to change it.</i>" "</span>");
+   label = gtk_label_new("<span fgcolor=\"blue\">"
+      "<i>Double-click a column's value to change it.</i>" "</span>");
    gtk_label_set_use_markup(GTK_LABEL(label), TRUE);
    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_CENTER);
 
@@ -4397,7 +4381,7 @@ static gint gapc_panel_about_page(GtkNotebook * notebook, gchar * pch_pname,
    gtk_image_set_from_pixbuf(GTK_IMAGE(image), scaled);
    gtk_box_pack_start(GTK_BOX(hbox), image, TRUE, TRUE, 0);
    gtk_widget_show(image);
-   gdk_pixbuf_unref(scaled);
+   g_clear_object(&scaled);
 
    label = gtk_label_new(about_text);
    gtk_label_set_use_markup(GTK_LABEL(label), TRUE);
@@ -5216,11 +5200,7 @@ static void cb_monitor_interface_destroy(GtkWidget * widget, PGAPC_MONITOR pm)
    g_clear_pointer(&pm->phs.plg->x_label_text, g_free);
    g_clear_pointer(&pm->phs.plg->y_label_text, g_free);
    g_clear_pointer(&pm->phs.plg->x_title_text, g_free);
-   g_clear_object(&pm->phs.plg->window_gc);
-   g_clear_object(&pm->phs.plg->box_gc);
-   g_clear_object(&pm->phs.plg->scale_gc);
-   g_clear_object(&pm->phs.plg->title_gc);
-   g_clear_object(&pm->phs.plg->series_gc);
+   g_clear_pointer(&pm->phs.plg->graph_cr, cairo_destroy);
    g_clear_pointer(&pm->phs.plg, g_free);
    g_clear_pointer(&pm, g_free);
    return;
@@ -5475,6 +5455,10 @@ static gboolean gapc_timeout_graph_startup(PGAPC_HISTORY pphs)
    if (return_value == G_SOURCE_REMOVE) {
       pm = (PGAPC_MONITOR)pphs->gp;
       pm->tid_graph_startup = 0;
+      pm->tid_graph_refresh = g_timeout_add(
+         (guint) (pphs->d_xinc * GAPC_REFRESH_FACTOR_1K ),
+         G_SOURCE_FUNC(gapc_timeout_graph_refresh),
+         pphs);
    }
    return return_value;
 }
@@ -5538,19 +5522,13 @@ static gint gapc_monitor_history_page(PGAPC_MONITOR pm, GtkWidget * notebook)
        }
 
        pch = g_strdup_printf(
-                 "<i>sampled every %3.1f seconds</i>",
+                 "<span size=\"small\"><i>sampled every %3.1f seconds</i></span>",
                  pm->phs.d_xinc);
        lg_graph_set_x_label_text (plg, pch);
        g_clear_pointer(&pch, g_free);
 
        lg_graph_set_chart_title (plg, pm->ch_title_info);
    }
-
-   pm->tid_graph_refresh = g_timeout_add(
-      (guint) (pphs->d_xinc * GAPC_REFRESH_FACTOR_1K ),
-      G_SOURCE_FUNC(gapc_timeout_graph_refresh),
-      pphs);
-
    /* collect one right away */
    pphs->b_startup = TRUE;
    pm->tid_graph_startup = g_timeout_add(
@@ -5626,7 +5604,6 @@ static PLGRAPH lg_graph_create (GtkWidget * box, gint width, gint height)
     PLGRAPH     plg = NULL;
     PGAPC_CONFIG pcfg = NULL;
     GtkWidget  *drawing_area = NULL;
-    GdkColor    color;
     PangoFontDescription *font_desc = NULL;
     gchar *pstring = NULL;
 
@@ -5643,9 +5620,9 @@ static PLGRAPH lg_graph_create (GtkWidget * box, gint width, gint height)
     /*
      * These must be set before the first drawing_area configure event
      */
-    lg_graph_set_chart_title  (plg, "Waiting for Update");
-    lg_graph_set_y_label_text (plg, "Precentage of 100% normal");
-    lg_graph_set_x_label_text (plg, "Waiting for Update");
+    lg_graph_set_chart_title  (plg, "<span size=\"medium\">Waiting for Update</span>");
+    lg_graph_set_y_label_text (plg, "<span size=\"small\">Percentage of 100% normal</span>");
+    lg_graph_set_x_label_text (plg, "<span size=\"small\">Waiting for Update</span>");
 
     g_snprintf (plg->ch_tooltip_text, sizeof (plg->ch_tooltip_text), "%s",
                 "Waiting for Graphable Data...");
@@ -5674,41 +5651,12 @@ static PLGRAPH lg_graph_create (GtkWidget * box, gint width, gint height)
     gtk_widget_set_size_request (GTK_WIDGET (drawing_area), width, height); // XXX TODO revisit on GTK 3
     gtk_box_pack_start (GTK_BOX (box), drawing_area, TRUE, TRUE, 0);
 
-    font_desc = pango_font_description_from_string ("Monospace 10");
+    font_desc = pango_font_description_from_string ("Mono 10");
     gtk_widget_modify_font (drawing_area, font_desc);
     pango_font_description_free (font_desc);
 
     gtk_widget_realize (drawing_area);
     gtk_widget_show (drawing_area);
-
-    plg->series_gc = gdk_gc_new (drawing_area->window);
-    plg->window_gc = gdk_gc_new (drawing_area->window);
-    plg->box_gc = gdk_gc_new (drawing_area->window);
-    plg->scale_gc = gdk_gc_new (drawing_area->window);
-    plg->title_gc = gdk_gc_new (drawing_area->window);
-
-    gdk_gc_copy (plg->series_gc,
-                 drawing_area->style->fg_gc[gtk_widget_get_state(drawing_area)]);
-    gdk_gc_copy (plg->window_gc,
-                 drawing_area->style->bg_gc[gtk_widget_get_state(drawing_area)]);
-    gdk_gc_copy (plg->box_gc,
-                 drawing_area->style->fg_gc[gtk_widget_get_state(drawing_area)]);
-    gdk_gc_copy (plg->scale_gc,
-                 drawing_area->style->fg_gc[gtk_widget_get_state(drawing_area)]);
-    gdk_gc_copy (plg->title_gc,
-                 drawing_area->style->text_aa_gc[gtk_widget_get_state(drawing_area)]);
-
-    gdk_color_parse (plg->ch_color_window_bg, &color);
-    gdk_gc_set_rgb_fg_color (plg->window_gc, &color);
-
-    gdk_color_parse (plg->ch_color_chart_bg, &color);
-    gdk_gc_set_rgb_fg_color (plg->box_gc, &color);
-
-    gdk_color_parse (plg->ch_color_scale_fg, &color);
-    gdk_gc_set_rgb_fg_color (plg->scale_gc, &color);
-
-    gdk_color_parse (plg->ch_color_title_fg, &color);
-    gdk_gc_set_rgb_fg_color (plg->title_gc, &color);
 
     /* --- Signals used to handle backing pixmap --- */
     g_signal_connect (drawing_area, "configure_event",
@@ -5908,7 +5856,7 @@ static gint gapc_monitor_text_report_page(PGAPC_MONITOR pm, GtkWidget * notebook
    gtk_widget_show(view);
 
    /* Change default font throughout the widget */
-   font_desc = pango_font_description_from_string("Monospace 9");
+   font_desc = pango_font_description_from_string("Mono 9");
    gtk_widget_modify_font(view, font_desc);
    pango_font_description_free(font_desc);
 

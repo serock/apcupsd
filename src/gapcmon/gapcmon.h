@@ -202,7 +202,7 @@ typedef struct _LGRAPH_SERIES {
     gdouble     d_max_value;
     gdouble     d_min_value;
     gdouble    *lg_point_dvalue;    /* array of doubles y values zero based, x = index */
-    GdkPoint   *point_pos;      /* last gdk position each point - recalc on evey draw */
+    GdkPoint   *point_pos;      /* last gdk position each point - recalc on every draw */
 } LG_SERIES, *PLG_SERIES;
 
 typedef struct _LGRAPH_RANGES {
@@ -222,11 +222,7 @@ typedef struct _LG_GRAPH {
     guint       tid_configure;  /* timeout after configure event */
     GtkWidget  *drawing_area;
     GdkPixmap  *pixmap;         /* --- Backing pixmap for drawing area  --- */
-    GdkGC      *window_gc;
-    GdkGC      *box_gc;
-    GdkGC      *scale_gc;
-    GdkGC      *title_gc;
-    GdkGC      *series_gc;
+    cairo_t    *graph_cr;
     /* data points and tooltip info */
     gint        i_num_series;   /* 1 based */
     GList      *lg_series;      /* double-linked list of data series PLG_SERIES */

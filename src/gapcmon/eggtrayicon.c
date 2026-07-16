@@ -222,7 +222,7 @@ static void egg_tray_icon_unrealize(GtkWidget * widget)
    if (icon->manager_window != None) {
       GdkWindow *gdkwin;
 
-      gdkwin = gdk_window_lookup_for_display(gtk_widget_get_display(widget),
+      gdkwin = gdk_x11_window_lookup_for_display(gtk_widget_get_display(widget),
          icon->manager_window);
 
       gdk_window_remove_filter(gdkwin, egg_tray_icon_manager_filter, icon);
@@ -293,7 +293,7 @@ egg_tray_icon_update_manager_window(EggTrayIcon * icon, gboolean dock_if_realize
       GdkWindow *gdkwin;
 
       gdkwin =
-         gdk_window_lookup_for_display(gtk_widget_get_display(GTK_WIDGET(icon)),
+         gdk_x11_window_lookup_for_display(gtk_widget_get_display(GTK_WIDGET(icon)),
          icon->manager_window);
 
       gdk_window_add_filter(gdkwin, egg_tray_icon_manager_filter, icon);
@@ -341,7 +341,7 @@ static void egg_tray_icon_manager_window_destroyed(EggTrayIcon * icon)
 
    g_return_if_fail(icon->manager_window != None);
 
-   gdkwin = gdk_window_lookup_for_display(gtk_widget_get_display(GTK_WIDGET(icon)),
+   gdkwin = gdk_x11_window_lookup_for_display(gtk_widget_get_display(GTK_WIDGET(icon)),
       icon->manager_window);
 
    gdk_window_remove_filter(gdkwin, egg_tray_icon_manager_filter, icon);
