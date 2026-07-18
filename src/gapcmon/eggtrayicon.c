@@ -4,7 +4,7 @@
  *
  * Modified by James Scott, Jr <skoona@users.sourceforge.net>
  * - To enhance events and size management  4/2006
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, 
+ * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1335, USA.
  */
 
@@ -62,8 +62,9 @@ static void egg_tray_icon_get_property(GObject * object,
 static void egg_tray_icon_realize(GtkWidget * widget);
 static void egg_tray_icon_unrealize(GtkWidget * widget);
 
-static void egg_tray_icon_add (GtkContainer *container,
-			       GtkWidget    *widget);
+static void egg_tray_icon_add (
+   GtkContainer *container,
+   GtkWidget    *widget);
 
 static void egg_tray_icon_update_manager_window(EggTrayIcon * icon,
    gboolean dock_if_realized);
@@ -171,9 +172,9 @@ static void egg_tray_icon_get_orientation_property(EggTrayIcon * icon)
       XA_CARDINAL, &type, &format, &nitems, &bytes_after, &(prop.prop_ch));
    error = gdk_error_trap_pop();
 
-   if (error || result != Success)
+   if (error || result != Success) {
       return;
-
+   }
    if (type == XA_CARDINAL) {
       GtkOrientation orientation;
 
@@ -186,9 +187,9 @@ static void egg_tray_icon_get_orientation_property(EggTrayIcon * icon)
          g_object_notify(G_OBJECT(icon), "orientation");
       }
    }
-
-   if (prop.prop)
+   if (prop.prop) {
       XFree(prop.prop);
+   }
 }
 
 static GdkFilterReturn
@@ -232,8 +233,9 @@ static void egg_tray_icon_unrealize(GtkWidget * widget)
 
    gdk_window_remove_filter(root_window, egg_tray_icon_manager_filter, icon);
 
-   if (GTK_WIDGET_CLASS(parent_class)->unrealize)
+   if (GTK_WIDGET_CLASS(parent_class)->unrealize) {
       (*GTK_WIDGET_CLASS(parent_class)->unrealize) (widget);
+   }
 }
 
 static void
@@ -247,7 +249,7 @@ egg_tray_icon_send_manager_message(EggTrayIcon * icon,
    ev.window = window;
    ev.message_type = icon->system_tray_opcode_atom;
    ev.format = 32;
-   ev.data.l[0] = gdk_x11_get_server_time(GTK_WIDGET(icon)->window);
+   ev.data.l[0] = gdk_x11_get_server_time(gtk_widget_get_window(GTK_WIDGET(icon)));
    ev.data.l[1] = message;
    ev.data.l[2] = data1;
    ev.data.l[3] = data2;
@@ -273,19 +275,19 @@ egg_tray_icon_update_manager_window(EggTrayIcon * icon, gboolean dock_if_realize
 {
    Display *xdisplay;
 
-   if (icon->manager_window != None)
+   if (icon->manager_window != None) {
       return;
-
+   }
    xdisplay = GDK_DISPLAY_XDISPLAY(gtk_widget_get_display(GTK_WIDGET(icon)));
 
    XGrabServer(xdisplay);
 
    icon->manager_window = XGetSelectionOwner(xdisplay, icon->selection_atom);
 
-   if (icon->manager_window != None)
+   if (icon->manager_window != None) {
       XSelectInput(xdisplay,
          icon->manager_window, StructureNotifyMask | PropertyChangeMask);
-
+   }
    XUngrabServer(xdisplay);
    XFlush(xdisplay);
 
@@ -308,32 +310,40 @@ egg_tray_icon_update_manager_window(EggTrayIcon * icon, gboolean dock_if_realize
 static gboolean
 transparent_expose_event (GtkWidget *widget, GdkEventExpose *event, gpointer user_data)
 {
-  gdk_window_clear_area (widget->window, event->area.x, event->area.y,
-			 event->area.width, event->area.height);
-  return FALSE;
+   gdk_window_clear_area (
+      gtk_widget_get_window(widget),
+      event->area.x, event->area.y,
+      event->area.width, event->area.height);
+   return FALSE;
 }
 
 static void
-make_transparent_again (GtkWidget *widget, GtkStyle *previous_style,
-			gpointer user_data)
+make_transparent_again (
+   GtkWidget *widget,
+   GtkStyle *previous_style,
+   gpointer user_data)
 {
-  gdk_window_set_back_pixmap (widget->window, NULL, TRUE);
+   gdk_window_set_back_pixmap (gtk_widget_get_window(widget), NULL, TRUE);
 }
 
 static void
 make_transparent (GtkWidget *widget, gpointer user_data)
 {
-  if (!gtk_widget_get_has_window (widget) || gtk_widget_get_app_paintable (widget))
-    return;
-
-  gtk_widget_set_app_paintable (widget, TRUE);
-  gtk_widget_set_double_buffered (widget, FALSE);
-  gdk_window_set_back_pixmap (widget->window, NULL, TRUE);
-  g_signal_connect (widget, "expose_event",
-		    G_CALLBACK (transparent_expose_event), NULL);
-  g_signal_connect_after (widget, "style_set",
-			  G_CALLBACK (make_transparent_again), NULL);
-}	
+   if (!gtk_widget_get_has_window (widget) || gtk_widget_get_app_paintable (widget)) {
+      return;
+   }
+   gtk_widget_set_app_paintable (widget, TRUE);
+   gtk_widget_set_double_buffered (widget, FALSE);
+   gdk_window_set_back_pixmap (gtk_widget_get_window (widget), NULL, TRUE);
+   g_signal_connect (
+      widget,
+      "expose_event",
+      G_CALLBACK (transparent_expose_event), NULL);
+   g_signal_connect_after (
+      widget,
+      "style_set",
+      G_CALLBACK (make_transparent_again), NULL);
+}
 
 static void egg_tray_icon_manager_window_destroyed(EggTrayIcon * icon)
 {
@@ -361,9 +371,9 @@ static void egg_tray_icon_realize(GtkWidget * widget)
    char buffer[256];
    GdkWindow *root_window;
 
-   if (GTK_WIDGET_CLASS(parent_class)->realize)
+   if (GTK_WIDGET_CLASS(parent_class)->realize) {
       GTK_WIDGET_CLASS(parent_class)->realize(widget);
-
+   }
    make_transparent (widget, NULL);
 
    screen = gtk_widget_get_screen(widget);
@@ -396,9 +406,11 @@ static void egg_tray_icon_realize(GtkWidget * widget)
 static void
 egg_tray_icon_add (GtkContainer *container, GtkWidget *widget)
 {
-  g_signal_connect (widget, "realize",
-		    G_CALLBACK (make_transparent), NULL);
-  GTK_CONTAINER_CLASS (parent_class)->add (container, widget);
+   g_signal_connect (
+      widget,
+      "realize",
+      G_CALLBACK (make_transparent), NULL);
+   GTK_CONTAINER_CLASS (parent_class)->add (container, widget);
 }
 
 EggTrayIcon *egg_tray_icon_new_for_screen(GdkScreen * screen, const char *name)
@@ -423,12 +435,12 @@ egg_tray_icon_send_message(EggTrayIcon * icon,
    g_return_val_if_fail(timeout >= 0, 0);
    g_return_val_if_fail(message != NULL, 0);
 
-   if (icon->manager_window == None)
+   if (icon->manager_window == None) {
       return 0;
-
-   if (len < 0)
+   }
+   if (len < 0) {
       len = strlen(message);
-
+   }
    stamp = icon->stamp++;
 
    /* Get ready to send the message */

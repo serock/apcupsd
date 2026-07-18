@@ -502,20 +502,22 @@ static void lg_graph_set_chart_title_color (PLGRAPH plg, gchar * pch_color)
 }
 static void lg_graph_redraw (PLGRAPH plg)
 {
-    GdkRectangle update_rect;
-    GdkRegion  *region = NULL;
+   GtkAllocation  allocation;
+   GdkRectangle   update_rect;
+   GdkRegion     *region = NULL;
 
-    g_return_if_fail (plg != NULL);
+   g_return_if_fail (plg != NULL);
 
-    update_rect.x = 0;
-    update_rect.y = 0;
-    update_rect.width = plg->drawing_area->allocation.width;
-    update_rect.height = plg->drawing_area->allocation.height;
+   gtk_widget_get_allocation (plg->drawing_area, &allocation);
+   update_rect.x = 0;
+   update_rect.y = 0;
+   update_rect.width = allocation.width;
+   update_rect.height = allocation.height;
 
-    /* --- And then draw it (calls expose event) --- */
-    region = gdk_region_rectangle (&update_rect);
-    gdk_window_invalidate_region (plg->drawing_area->window, region, FALSE);
-    gdk_region_destroy (region);
+   /* --- And then draw it (calls expose event) --- */
+   region = gdk_region_rectangle (&update_rect);
+   gdk_window_invalidate_region (gtk_widget_get_window (plg->drawing_area), region, FALSE);
+   gdk_region_destroy (region);
 }
 
 /*
@@ -1035,7 +1037,7 @@ static gint lg_graph_draw_vertical_text (PLGRAPH plg,
       GdkRegion  *region = NULL;
 
       region = gdk_region_rectangle (rect);
-      gdk_window_invalidate_region (plg->drawing_area->window, region, FALSE);
+      gdk_window_invalidate_region (gtk_widget_get_window (plg->drawing_area), region, FALSE);
       gdk_region_destroy (region);
    }
    return rect->height;
@@ -1104,7 +1106,7 @@ static gint lg_graph_draw_horizontal_text (PLGRAPH plg,
       GdkRegion  *region = NULL;
 
       region = gdk_region_rectangle (rect);
-      gdk_window_invalidate_region (plg->drawing_area->window, region, FALSE);
+      gdk_window_invalidate_region (gtk_widget_get_window (plg->drawing_area), region, FALSE);
       gdk_region_destroy (region);
    }
    return rect->width;
@@ -1173,9 +1175,10 @@ static void lg_graph_set_ranges (PLGRAPH plg,
  */
 static gboolean lg_graph_draw (PLGRAPH plg)
 {
-   GdkColor color;
-   GtkWidget  *drawing_area = NULL;
-   cairo_t *graph_cr = NULL;
+   GtkAllocation  allocation;
+   GdkColor       color;
+   GtkWidget     *drawing_area = NULL;
+   cairo_t       *graph_cr = NULL;
 
    g_return_val_if_fail (plg != NULL, G_SOURCE_CONTINUE);
 
@@ -1189,14 +1192,15 @@ static gboolean lg_graph_draw (PLGRAPH plg)
    /*
     * Clear the whole area
     */
+   gtk_widget_get_allocation (drawing_area, &allocation);
    gdk_color_parse (plg->ch_color_window_bg, &color);
    gdk_cairo_set_source_color (graph_cr, &color);
    cairo_rectangle (
       graph_cr,
       0.0,
       0.0,
-      (gdouble)plg->drawing_area->allocation.width,
-      (gdouble)plg->drawing_area->allocation.height);
+      (gdouble)allocation.width,
+      (gdouble)allocation.height);
    cairo_fill (graph_cr);
 
    /*
@@ -1227,8 +1231,9 @@ static gboolean lg_graph_draw (PLGRAPH plg)
    if (lg_graph_debug) {
       g_print(
          "Window: Width=%d, Height=%d, Plot Area x=%d y=%d width=%d, height=%d\n",
-         drawing_area->allocation.width, drawing_area->allocation.height,
-         plg->plot_box.x, plg->plot_box.y, plg->plot_box.width, plg->plot_box.height);
+         allocation.width, allocation.height,
+         plg->plot_box.x, plg->plot_box.y,
+         plg->plot_box.width, plg->plot_box.height);
    }
 
    /*
@@ -1279,10 +1284,11 @@ static gboolean lg_graph_configure_event_cb (GtkWidget * widget,
                                              GdkEventConfigure * event,
                                              PLGRAPH plg)
 {
-   GdkColor     color;
-   GdkRectangle clip_area;
-   gint         xfactor = 0;
-   gint         yfactor = 0;
+   GtkAllocation allocation;
+   GdkColor      color;
+   GdkRectangle  clip_area;
+   gint          xfactor = 0;
+   gint          yfactor = 0;
 
    /* --- Free background if we created it --- */
    if (plg->pixmap) {
@@ -1290,9 +1296,10 @@ static gboolean lg_graph_configure_event_cb (GtkWidget * widget,
    }
 
    /* --- Create a new pixmap with new size --- */
-   plg->pixmap = gdk_pixmap_new (widget->window,
-                                 widget->allocation.width,
-                                 widget->allocation.height, -1);
+   gtk_widget_get_allocation (widget, &allocation);
+   plg->pixmap = gdk_pixmap_new (gtk_widget_get_window (widget),
+                                 allocation.width,
+                                 allocation.height, -1);
 
    if (plg->graph_cr != NULL) {
       g_clear_pointer(&plg->graph_cr, cairo_destroy);
@@ -1307,17 +1314,17 @@ static gboolean lg_graph_configure_event_cb (GtkWidget * widget,
       plg->graph_cr,
       0.0,
       0.0,
-      (gdouble)widget->allocation.width,
-      (gdouble)widget->allocation.height);
+      (gdouble)allocation.width,
+      (gdouble)allocation.height);
    cairo_fill(plg->graph_cr);
 
-   plg->width = widget->allocation.width;
-   plg->height = widget->allocation.height;
+   plg->width = allocation.width;
+   plg->height = allocation.height;
 
    clip_area.x = 0;
    clip_area.y = 0;
-   clip_area.width = widget->allocation.width;
-   clip_area.height = widget->allocation.height;
+   clip_area.width = allocation.width;
+   clip_area.height = allocation.height;
 
    xfactor = MAX (plg->x_range.i_num_minor, plg->x_range.i_num_major);
    yfactor = MAX (plg->y_range.i_num_minor, plg->y_range.i_num_major);
@@ -1383,7 +1390,7 @@ static gboolean lg_graph_configure_event_cb (GtkWidget * widget,
 static gint lg_graph_expose_event_cb (GtkWidget * widget, GdkEventExpose * event,
                                       PLGRAPH plg)
 {
-   g_return_val_if_fail (GDK_IS_DRAWABLE (widget->window), FALSE);
+   g_return_val_if_fail (GDK_IS_DRAWABLE (gtk_widget_get_window (widget)), FALSE);
 
    /* --- Copy pixmap to the window --- */
    cairo_t *drawing_area_cr = gdk_cairo_create (gtk_widget_get_window (widget));
@@ -2078,7 +2085,7 @@ static gint gapc_monitor_update(PGAPC_MONITOR pm)
    g_snprintf(pbar->c_text, sizeof(pbar->c_text), "%s from Utility", pch);
    w = g_hash_table_lookup(pm->pht_Widgets, "HBar1-Widget");
    if (gtk_widget_is_drawable(w))
-      gdk_window_invalidate_rect(w->window, &pbar->rect, FALSE);
+      gdk_window_invalidate_rect(gtk_widget_get_window(w), &pbar->rect, FALSE);
 
    pch = g_hash_table_lookup(pm->pht_Status, "BATTV");
    if (pch == NULL) {
@@ -2100,7 +2107,7 @@ static gint gapc_monitor_update(PGAPC_MONITOR pm)
 
    w = g_hash_table_lookup(pm->pht_Widgets, "HBar2-Widget");
    if (gtk_widget_is_drawable(w))
-      gdk_window_invalidate_rect(w->window, &pbar->rect, FALSE);
+      gdk_window_invalidate_rect(gtk_widget_get_window(w), &pbar->rect, FALSE);
 
    pch = g_hash_table_lookup(pm->pht_Status, "BCHARGE");
    if (pch == NULL) {
@@ -2114,7 +2121,7 @@ static gint gapc_monitor_update(PGAPC_MONITOR pm)
    g_snprintf(pbar->c_text, sizeof(pbar->c_text), "%s Battery Charge", pch);
    w = g_hash_table_lookup(pm->pht_Widgets, "HBar3-Widget");
    if (gtk_widget_is_drawable(w))
-      gdk_window_invalidate_rect(w->window, &pbar->rect, FALSE);
+      gdk_window_invalidate_rect(gtk_widget_get_window(w), &pbar->rect, FALSE);
 
    pch = g_hash_table_lookup(pm->pht_Status, "LOADPCT");
    if (pch == NULL) {
@@ -2129,7 +2136,7 @@ static gint gapc_monitor_update(PGAPC_MONITOR pm)
 
    w = g_hash_table_lookup(pm->pht_Widgets, "HBar4-Widget");
    if (gtk_widget_is_drawable(w))
-      gdk_window_invalidate_rect(w->window, &pbar->rect, FALSE);
+      gdk_window_invalidate_rect(gtk_widget_get_window(w), &pbar->rect, FALSE);
 
    pch = g_hash_table_lookup(pm->pht_Status, "TIMELEFT");
    if (pch == NULL) {
@@ -2144,7 +2151,7 @@ static gint gapc_monitor_update(PGAPC_MONITOR pm)
    g_snprintf(pbar->c_text, sizeof(pbar->c_text), "%s Remaining", pch);
    w = g_hash_table_lookup(pm->pht_Widgets, "HBar5-Widget");
    if (gtk_widget_is_drawable(w))
-      gdk_window_invalidate_rect(w->window, &pbar->rect, FALSE);
+      gdk_window_invalidate_rect(gtk_widget_get_window(w), &pbar->rect, FALSE);
 
    /*
     * information window update */
@@ -2957,45 +2964,47 @@ static gint gapc_util_update_hashtable(PGAPC_MONITOR pm, gchar * pch_unparsed)
 static gboolean cb_util_barchart_handle_exposed(GtkWidget * widget,
    GdkEventExpose * event, gpointer data)
 {
-   PGAPC_BAR_H pbar = data;
-   gint i_percent = 0;
-   PangoLayout *playout = NULL;
+   GtkAllocation  allocation;
+   PGAPC_BAR_H    pbar = data;
+   gint           i_percent = 0;
+   PangoLayout   *playout = NULL;
 
    g_return_val_if_fail(data, FALSE);   /* error exit */
 
+   gtk_widget_get_allocation(widget, &allocation);
    pbar->rect.x = 0;
    pbar->rect.y = 0;
-   pbar->rect.width = widget->allocation.width;
-   pbar->rect.height = widget->allocation.height;
+   pbar->rect.width = allocation.width;
+   pbar->rect.height = allocation.height;
 
    /* scale up the less than zero data value */
    i_percent =
-      (gint) ((gdouble) (widget->allocation.width / 100.0) *
+      (gint) ((gdouble) (allocation.width / 100.0) *
       (gdouble) (pbar->d_value * 100.0));
 
    /* the frame of the chart */
    gtk_paint_box(
-      widget->style,
-      widget->window,
+      gtk_widget_get_style(widget),
+      gtk_widget_get_window(widget),
       gtk_widget_get_state(widget),
       GTK_SHADOW_ETCHED_IN,
       &pbar->rect,
       widget,
       "gapc_hbar_frame",
       0, 0,
-      widget->allocation.width - 1, widget->allocation.height - 1);
+      allocation.width - 1, allocation.height - 1);
 
    /* the scaled value */
    gtk_paint_box(
-      widget->style,
-      widget->window,
+      gtk_widget_get_style(widget),
+      gtk_widget_get_window(widget),
       GTK_STATE_ACTIVE,
       GTK_SHADOW_OUT,
       &pbar->rect,
       widget,
       "gapc_hbar_value",
       1, 1,
-      i_percent, widget->allocation.height - 4);
+      i_percent, allocation.height - 4);
 
    if (pbar->c_text[0]) {
       gint x = 0, y = 0;
@@ -3004,12 +3013,19 @@ static gboolean cb_util_barchart_handle_exposed(GtkWidget * widget,
       pango_layout_set_markup(playout, pbar->c_text, -1);
 
       pango_layout_get_pixel_size(playout, &x, &y);
-      x = (widget->allocation.width - x) / 2;
-      y = (widget->allocation.height - y) / 2;
+      x = (allocation.width - x) / 2;
+      y = (allocation.height - y) / 2;
 
-      gtk_paint_layout(widget->style, widget->window, GTK_STATE_NORMAL, TRUE,
-         &pbar->rect, widget, "gapc_hbar_text",
-         (pbar->b_center_text) ? x : 6, y, playout);
+      gtk_paint_layout(
+         gtk_widget_get_style(widget),
+         gtk_widget_get_window(widget),
+         GTK_STATE_NORMAL,
+         TRUE,
+         &pbar->rect,
+         widget,
+         "gapc_hbar_text",
+         (pbar->b_center_text) ? x : 6, y,
+         playout);
 
       g_clear_object(&playout);
    }
@@ -4483,17 +4499,16 @@ static gboolean cb_util_manage_iconify_event(GtkWidget *widget, GdkEventWindowSt
       ((event->changed_mask & GDK_WINDOW_STATE_ICONIFIED) && (event->new_window_state & GDK_WINDOW_STATE_ICONIFIED)) ||
       ((event->changed_mask & GDK_WINDOW_STATE_WITHDRAWN) && (event->new_window_state & GDK_WINDOW_STATE_WITHDRAWN))
                                            )){
-        if ( ((PGAPC_MONITOR)gp)->cb_id == CB_MONITOR_ID) {
-              if ( event->window == GTK_WIDGET(((PGAPC_MONITOR)gp)->window)->window ) {
-                   ((PGAPC_MONITOR)gp)->b_visible = FALSE;
-              }
-        } else {
-              if ( event->window == GTK_WIDGET(((PGAPC_CONFIG)gp)->window)->window ) {
-                 ((PGAPC_CONFIG)gp)->b_visible = FALSE;
-              }
-        }
-
-    return TRUE;
+      if ( ((PGAPC_MONITOR)gp)->cb_id == CB_MONITOR_ID) {
+         if ( event->window == gtk_widget_get_window(GTK_WIDGET(((PGAPC_MONITOR)gp)->window))) {
+            ((PGAPC_MONITOR)gp)->b_visible = FALSE;
+         }
+      } else {
+         if ( event->window == gtk_widget_get_window(GTK_WIDGET(((PGAPC_CONFIG)gp)->window))) {
+            ((PGAPC_CONFIG)gp)->b_visible = FALSE;
+         }
+      }
+      return TRUE;
    }
 
    /* un - iconified */
@@ -4501,19 +4516,17 @@ static gboolean cb_util_manage_iconify_event(GtkWidget *widget, GdkEventWindowSt
       ((event->changed_mask & GDK_WINDOW_STATE_ICONIFIED) && !(event->new_window_state & GDK_WINDOW_STATE_ICONIFIED)) ||
       ((event->changed_mask & GDK_WINDOW_STATE_WITHDRAWN) && !(event->new_window_state & GDK_WINDOW_STATE_WITHDRAWN)))
                                               ) {
-        if ( ((PGAPC_MONITOR)gp)->cb_id == CB_MONITOR_ID) {
-              if ( event->window == GTK_WIDGET(((PGAPC_MONITOR)gp)->window)->window ) {
-                   ((PGAPC_MONITOR)gp)->b_visible = TRUE;
-              }
-        } else {
-              if ( event->window == GTK_WIDGET(((PGAPC_CONFIG)gp)->window)->window ) {
-                 ((PGAPC_CONFIG)gp)->b_visible = TRUE;
-              }
-        }
-
-    return TRUE;
+      if ( ((PGAPC_MONITOR)gp)->cb_id == CB_MONITOR_ID) {
+         if ( event->window == gtk_widget_get_window(GTK_WIDGET(((PGAPC_MONITOR)gp)->window))) {
+            ((PGAPC_MONITOR)gp)->b_visible = TRUE;
+         }
+      } else {
+         if ( event->window == gtk_widget_get_window(GTK_WIDGET(((PGAPC_CONFIG)gp)->window))) {
+            ((PGAPC_CONFIG)gp)->b_visible = TRUE;
+         }
+      }
+      return TRUE;
    }
-
    return FALSE;
 }
 
