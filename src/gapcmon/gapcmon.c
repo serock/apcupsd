@@ -808,9 +808,9 @@ static gint lg_graph_draw_grid_lines (PLGRAPH plg)
       cairo_move_to (
          plg->graph_cr,
          (gdouble)(plg->plot_box.x + (x_minor_inc * (x_index + 1))), (gdouble)plg->plot_box.y);
-      cairo_line_to (
+      cairo_rel_line_to (
          plg->graph_cr,
-         (gdouble)(plg->plot_box.x + (x_minor_inc * (x_index + 1))), (gdouble)(plg->plot_box.y + y_pos));
+         0.0, (gdouble)(y_pos));
    }
    cairo_stroke(plg->graph_cr);
 
@@ -820,9 +820,9 @@ static gint lg_graph_draw_grid_lines (PLGRAPH plg)
       cairo_move_to (
          plg->graph_cr,
          (gdouble)(plg->plot_box.x + (x_major_inc * (x_index + 1))), (gdouble)plg->plot_box.y);
-      cairo_line_to (
+      cairo_rel_line_to (
          plg->graph_cr,
-         (gdouble)(plg->plot_box.x + (x_major_inc * (x_index + 1))), (gdouble)(plg->plot_box.y + y_pos));
+         0.0, (gdouble)(y_pos));
    }
    cairo_stroke(plg->graph_cr);
 
