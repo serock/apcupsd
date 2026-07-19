@@ -218,44 +218,44 @@ typedef struct _LGRAPH_RANGES {
 } LG_RANGE , *PLG_RANGE;
 
 typedef struct _LG_GRAPH {
-    GAPCDataID  cb_id;
-    guint       tid_configure;  /* timeout after configure event */
-    GtkWidget  *drawing_area;
-    GdkPixmap  *pixmap;         /* --- Backing pixmap for drawing area  --- */
-    cairo_t    *graph_cr;
+    GAPCDataID       cb_id;
+    guint            tid_configure;  /* timeout after configure event */
+    GtkWidget       *drawing_area;
+    cairo_surface_t *graph_surface;  /* --- Backing surface for drawing area  --- */
+    cairo_t         *graph_cr;
     /* data points and tooltip info */
-    gint        i_num_series;   /* 1 based */
-    GList      *lg_series;      /* double-linked list of data series PLG_SERIES */
-    GList      *lg_series_time; /* time_t of each sample */
-    gint        i_points_available;
-    gboolean    b_tooltip_active;
+    gint             i_num_series;   /* 1 based */
+    GList           *lg_series;      /* double-linked list of data series PLG_SERIES */
+    GList           *lg_series_time; /* time_t of each sample */
+    gint             i_points_available;
+    gboolean         b_tooltip_active;
     /* actual size of graph area */
-    gint        width;
-    gint        height;
+    gint             width;
+    gint             height;
     /* buffer around all sides */
-    gint        x_border;
-    gint        y_border;
+    gint             x_border;
+    gint             y_border;
     /* current mouse position */
-    gboolean    b_mouse_onoff;
-    GdkPoint    mouse_pos;
-    GdkModifierType mouse_state;
+    gboolean         b_mouse_onoff;
+    GdkPoint         mouse_pos;
+    GdkModifierType  mouse_state;
     /* top/left or baseline of labels and titles */
-    gchar       ch_color_window_bg[GAPC_MAX_TEXT];
-    gchar       ch_color_chart_bg[GAPC_MAX_TEXT];
-    gchar       ch_color_title_fg[GAPC_MAX_BUFFER];
-    GdkRectangle x_label;
-    GdkRectangle y_label;
-    GdkRectangle x_title;
-    GdkRectangle x_tooltip;
-    gchar       ch_tooltip_text[GAPC_MAX_BUFFER];
-    gchar      *x_label_text;
-    gchar      *y_label_text;
-    gchar      *x_title_text;
+    gchar            ch_color_window_bg[GAPC_MAX_TEXT];
+    gchar            ch_color_chart_bg[GAPC_MAX_TEXT];
+    gchar            ch_color_title_fg[GAPC_MAX_BUFFER];
+    GdkRectangle     x_label;
+    GdkRectangle     y_label;
+    GdkRectangle     x_title;
+    GdkRectangle     x_tooltip;
+    gchar            ch_tooltip_text[GAPC_MAX_BUFFER];
+    gchar           *x_label_text;
+    gchar           *y_label_text;
+    gchar           *x_title_text;
     /* position and area of main graph plot area */
-    GdkRectangle plot_box;
-    gchar       ch_color_scale_fg[GAPC_MAX_TEXT];
-    LG_RANGE    x_range;
-    LG_RANGE    y_range;
+    GdkRectangle     plot_box;
+    gchar            ch_color_scale_fg[GAPC_MAX_TEXT];
+    LG_RANGE         x_range;
+    LG_RANGE         y_range;
 } LGRAPH   , *PLGRAPH;
 
 /* * Control structure for GtkExtra Charts in Information Window */

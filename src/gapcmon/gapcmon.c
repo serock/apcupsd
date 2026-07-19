@@ -1291,20 +1291,21 @@ static gboolean lg_graph_configure_event_cb (GtkWidget * widget,
    gint          yfactor = 0;
 
    /* --- Free background if we created it --- */
-   if (plg->pixmap) {
-      g_clear_object(&plg->pixmap);
+   if (plg->graph_surface != NULL) {
+      g_clear_pointer(&plg->graph_surface, cairo_surface_destroy);
    }
 
    /* --- Create a new pixmap with new size --- */
    gtk_widget_get_allocation (widget, &allocation);
-   plg->pixmap = gdk_pixmap_new (gtk_widget_get_window (widget),
-                                 allocation.width,
-                                 allocation.height, -1);
+   plg->graph_surface = cairo_image_surface_create (
+      CAIRO_FORMAT_ARGB32,
+      allocation.width,
+      allocation.height);
 
    if (plg->graph_cr != NULL) {
       g_clear_pointer(&plg->graph_cr, cairo_destroy);
    }
-   plg->graph_cr = gdk_cairo_create (plg->pixmap);
+   plg->graph_cr = cairo_create (plg->graph_surface);
    cairo_set_antialias (plg->graph_cr, CAIRO_ANTIALIAS_FAST);
    cairo_set_line_cap (plg->graph_cr, CAIRO_LINE_CAP_SQUARE);
 
@@ -1392,11 +1393,11 @@ static gint lg_graph_expose_event_cb (GtkWidget * widget, GdkEventExpose * event
 {
    g_return_val_if_fail (GDK_IS_DRAWABLE (gtk_widget_get_window (widget)), FALSE);
 
-   /* --- Copy pixmap to the window --- */
+   /* --- Copy surface to the window --- */
    cairo_t *drawing_area_cr = gdk_cairo_create (gtk_widget_get_window (widget));
-   gdk_cairo_set_source_pixmap (
+   cairo_set_source_surface (
       drawing_area_cr,
-      plg->pixmap,
+      plg->graph_surface,
       0.0,
       0.0);
    cairo_rectangle (
