@@ -25,6 +25,7 @@
 #define __EGG_TRAY_ICON_H__
 
 #include <gtk/gtk.h>
+#include <gtk/gtkx.h>
 #include <gdk/gdkx.h>
 #ifdef G_OS_WIN32
 #include <gdk/gdkwin32.h>

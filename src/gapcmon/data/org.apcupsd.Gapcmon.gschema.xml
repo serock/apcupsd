@@ -3,35 +3,35 @@
 
   <schema id="org.apcupsd.Gapcmon.controller" path="/org/apcupsd/gapcmon/controller/">
     <key name="color-battv" type="s">
-      <default>'#000000'</default>
+      <default>'rgb(0,0,0)'</default>
       <summary>Color of the BATTV data series on the Historical Summary graph</summary>
     </key>
     <key name="color-bcharge" type="s">
-      <default>'#ffff00'</default>
+      <default>'rgb(255,255,0)'</default>
       <summary>Color of the BCHARGE data series on the Historical Summary graph</summary>
     </key>
     <key name="color-chart" type="s">
-      <default>'#add8e6'</default>
+      <default>'rgb(173,216,230)'</default>
       <summary>Background color of charts</summary>
     </key>
     <key name="color-linev" type="s">
-      <default>'#008000'</default>
+      <default>'rgb(0,128,0)'</default>
       <summary>Color of the LINEV data series on the Historical Summary graph</summary>
     </key>
     <key name="color-loadpct" type="s">
-      <default>'#0000ff'</default>
+      <default>'rgb(0,0,255)'</default>
       <summary>Color of the LOADPCT data series on the Historical Summary graph</summary>
     </key>
     <key name="color-timeleft" type="s">
-      <default>'#ff0000'</default>
+      <default>'rgb(255,0,0)'</default>
       <summary>Color of the TIMELEFT data series on the Historical Summary graph</summary>
     </key>
     <key name="color-title" type="s">
-      <default>'#0000ff'</default>
+      <default>'rgb(0,0,255)'</default>
       <summary>Text color of titles</summary>
     </key>
     <key name="color-window" type="s">
-      <default>'#ffffff'</default>
+      <default>'rgb(255,255,255)'</default>
       <summary>Background color of windows</summary>
     </key>
     <key name="use-systray" type="b">

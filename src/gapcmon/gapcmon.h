@@ -188,7 +188,7 @@ typedef struct _GAPC_SUM_SQUARES {
    gdouble point_min;
    gdouble point_max;
 
-   GMutex *gm_graph;               /* Control mutex  for graphics filter */
+   GMutex gm_graph;                /* Control mutex  for graphics filter */
 } GAPC_SUMS, *PGAPC_SUMS;
 
 typedef struct _LGRAPH_SERIES {
@@ -198,7 +198,6 @@ typedef struct _LGRAPH_SERIES {
     gint        i_max_points;   /* 1 based */
     gchar       ch_legend_text[GAPC_MAX_TEXT];
     gchar       ch_legend_color[GAPC_MAX_TEXT];
-    GdkColor    legend_color;
     gdouble     d_max_value;
     gdouble     d_min_value;
     gdouble    *lg_point_dvalue;    /* array of doubles y values zero based, x = index */
@@ -219,10 +218,7 @@ typedef struct _LGRAPH_RANGES {
 
 typedef struct _LG_GRAPH {
     GAPCDataID       cb_id;
-    guint            tid_configure;  /* timeout after configure event */
     GtkWidget       *drawing_area;
-    cairo_surface_t *graph_surface;  /* --- Backing surface for drawing area  --- */
-    cairo_t         *graph_cr;
     /* data points and tooltip info */
     gint             i_num_series;   /* 1 based */
     GList           *lg_series;      /* double-linked list of data series PLG_SERIES */
@@ -293,7 +289,7 @@ typedef struct _Monitor_Instance_Data {
    gboolean b_run;                 /* controller for all monitor resources -- except thread */
    gboolean b_thread_stop;         /* single flag to stop thread */
    GThread *tid_thread_qwork;      /* Background Thread */
-   GMutex *gm_update;              /* Control mutex for hashtables and thread */
+   GMutex gm_update;               /* Control mutex for hashtables and thread */
    GAsyncQueue *q_network;
    guint i_netbusy_counter;
    guint tid_auto_refresh;         /* monitor refresh timer id */
@@ -375,7 +371,7 @@ typedef struct _System_Control_Data {
 /* ************************************************************************* */
 
 #define GAPC_GLOSSARY  "<span size=\"xx-large\"><b>GAPCMON</b></span>\n \
-A monitor for UPS's under the management of APCUPSD.\n\n \
+A monitor for UPSes under the management of APCUPSD.\n\n \
 When active, gapcmon provides three visual objects to interact with. \
 First is the main control.panel where monitors are defined, enabled, and listed when \
 active. Second are notification area icons that manage the visibility of each window or \

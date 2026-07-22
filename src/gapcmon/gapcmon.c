@@ -56,9 +56,6 @@
  *                      Communication to interface gtkthread through
  *                      a GAsyncQueue, with additional instance mutex
  *                          - protect hash table from multi-thread access
- *                          - protect GTK from multi-thread access
- *                            gdk_threads_[enter|leave] around gtk calls in timer
- *                            routines and threads - and gtk_main_loop.
  * ------------------------ ---------------------------------------------------
  *  GSettings Info
  *  Schemas:
@@ -126,23 +123,45 @@ static gint lg_graph_data_series_add (PLGRAPH plg, gchar * pch_legend_text,
 static gboolean lg_graph_data_series_remove_all (PLGRAPH plg);
 static gboolean lg_graph_data_series_add_value (PLGRAPH plg, gint i_series_number,
                                                 gdouble y_value);
-static gint lg_graph_data_series_draw (PLGRAPH plg, PLG_SERIES psd);
+static gint lg_graph_data_series_draw (
+   cairo_t    *graph_cr,
+   PLGRAPH     plg,
+   PLG_SERIES  psd);
 
 /*
  * Private Interfaces */
-static gint lg_graph_draw_tooltip (PLGRAPH plg);
-static gint lg_graph_data_series_draw_all (PLGRAPH plg, gboolean redraw_control);
+static gint lg_graph_draw_tooltip (
+   cairo_t *graph_cr,
+   PLGRAPH  plg);
+static gint lg_graph_data_series_draw_all (
+   cairo_t  *graph_cr,
+   PLGRAPH   plg,
+   gboolean  redraw_control);
 static void lg_graph_get_default_sizes (PLGRAPH plg, gint * width, gint * height);
-static void lg_graph_draw_x_grid_labels (PLGRAPH plg);
-static void lg_graph_draw_y_grid_labels (PLGRAPH plg);
-static gint lg_graph_draw_grid_lines (PLGRAPH plg);
-static gint lg_graph_draw_horizontal_text (PLGRAPH plg,
-                                           gchar * pch_text,
-                                           GdkRectangle * rect, gboolean redraw_control);
-static gint lg_graph_draw_vertical_text (PLGRAPH plg,
-                                         gchar * pch_text,
-                                         GdkRectangle * rect, gboolean redraw_control);
-static gboolean lg_graph_draw (PLGRAPH plg);
+static void lg_graph_draw_x_grid_labels (
+   cairo_t *graph_cr,
+   PLGRAPH  plg);
+static void lg_graph_draw_y_grid_labels (
+   cairo_t *graph_cr,
+   PLGRAPH  plg);
+static gint lg_graph_draw_grid_lines (
+   cairo_t *graph_cr,
+   PLGRAPH  plg);
+static gint lg_graph_draw_horizontal_text (
+   cairo_t      *graph_cr,
+   PLGRAPH       plg,
+   gchar        *pch_text,
+   GdkRectangle *rect,
+   gboolean      redraw_control);
+static gint lg_graph_draw_vertical_text (
+   cairo_t      *graph_cr,
+   PLGRAPH       plg,
+   gchar        *pch_text,
+   GdkRectangle *rect,
+   gboolean      redraw_control);
+static gboolean lg_graph_draw (
+   cairo_t *graph_cr,
+   PLGRAPH  plg);
 static gboolean lg_graph_configure_event_cb (GtkWidget * widget,
                                              GdkEventConfigure * event, PLGRAPH plg);
 static gint lg_graph_expose_event_cb (GtkWidget * widget, GdkEventExpose * event,
@@ -151,8 +170,6 @@ static gboolean lg_graph_motion_notify_event_cb (GtkWidget * widget, GdkEventMot
                                                  PLGRAPH plg);
 static gboolean lg_graph_button_press_event_cb (GtkWidget * widget, GdkEventButton * ev,
                                                 PLGRAPH plg);
-static gboolean cb_util_barchart_handle_exposed(GtkWidget * widget,
-   GdkEventExpose * event, gpointer data);
 static gboolean cb_util_line_chart_refresh(PGAPC_HISTORY pg);
 
 static gboolean cb_util_manage_iconify_event(GtkWidget *widget,
@@ -164,7 +181,7 @@ static gboolean gapc_util_text_view_clear_buffer(GtkWidget * view);
 static gboolean gapc_util_treeview_get_iter_from_monitor(GtkTreeModel * model,
    GtkTreeIter * iter, guint i_value);
 static gint gapc_util_update_hashtable(PGAPC_MONITOR pm, gchar * pch_unparsed);
-static void cb_panel_systray_icon_destroy(GtkObject * object, gpointer gp);
+// XXX static void cb_panel_systray_icon_destroy(GtkObject * object, gpointer gp);
 static void cb_main_interface_button_quit(GtkWidget * button, PGAPC_CONFIG pcfg);
 static void gapc_monitor_interface_destroy(PGAPC_CONFIG pcfg, guint i_monitor);
 static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, guint i_monitor,
@@ -205,11 +222,14 @@ static gboolean lg_graph_debug = FALSE;
  * Draws one data series points to chart
  * returns number of points processed
 */
-static gint lg_graph_data_series_draw (PLGRAPH plg, PLG_SERIES psd)
+static gint lg_graph_data_series_draw (
+   cairo_t    *graph_cr,
+   PLGRAPH     plg,
+   PLG_SERIES  psd)
 {
+   GdkRGBA   legend_color;
    gint      v_index = 0;
    GdkPoint *point_pos = NULL;
-   cairo_t  *graph_cr = NULL;
 
    g_return_val_if_fail (plg != NULL, -1);
    g_return_val_if_fail (psd != NULL, -1);
@@ -218,8 +238,8 @@ static gint lg_graph_data_series_draw (PLGRAPH plg, PLG_SERIES psd)
    if (psd->i_point_count == 0) {
       return 0;
    }
-   graph_cr = plg->graph_cr;
-   gdk_cairo_set_source_color (graph_cr, &psd->legend_color);
+   gdk_rgba_parse (&legend_color, psd->ch_legend_color);
+   gdk_cairo_set_source_rgba (graph_cr, &legend_color);
 
    point_pos = psd->point_pos;
 
@@ -261,7 +281,10 @@ static gint lg_graph_data_series_draw (PLGRAPH plg, PLG_SERIES psd)
  * Draws all data series points to chart
  * returns number of series processed, or -1 if not drawable
 */
-static gint lg_graph_data_series_draw_all (PLGRAPH plg, gboolean redraw_control)
+static gint lg_graph_data_series_draw_all (
+   cairo_t  *graph_cr,
+   PLGRAPH   plg,
+   gboolean  redraw_control)
 {
     PLG_SERIES  psd = NULL;
     GList      *data_sets = NULL;
@@ -279,7 +302,7 @@ static gint lg_graph_data_series_draw_all (PLGRAPH plg, gboolean redraw_control)
         psd = data_sets->data;
         if (psd != NULL)
         {                       /* found */
-            lg_graph_data_series_draw (plg, psd);
+            lg_graph_data_series_draw (graph_cr, plg, psd);
             v_index++;
         }
         data_sets = g_list_next (data_sets);
@@ -415,8 +438,10 @@ static gboolean lg_graph_data_series_remove_all (PLGRAPH plg)
  * allocates space for another data series
  * returns the series number of this dataset
 */
-static gint lg_graph_data_series_add (PLGRAPH plg, gchar * pch_legend_text,
-                                      gchar * pch_color_text)
+static gint lg_graph_data_series_add (
+   PLGRAPH  plg,
+   gchar   *pch_legend_text,
+   gchar   *pch_color_text)
 {
     PLG_SERIES  psd = NULL;
 
@@ -435,7 +460,6 @@ static gint lg_graph_data_series_add (PLGRAPH plg, gchar * pch_legend_text,
 
     g_snprintf (psd->ch_legend_text, sizeof (psd->ch_legend_text), "%s", pch_legend_text);
     psd->i_max_points = plg->x_range.i_max_scale;
-    gdk_color_parse (pch_color_text, &psd->legend_color);
     g_snprintf (psd->ch_legend_color, sizeof (psd->ch_legend_color), "%s",
                 pch_color_text);
     psd->cb_id = CB_SERIES_ID;
@@ -443,12 +467,10 @@ static gint lg_graph_data_series_add (PLGRAPH plg, gchar * pch_legend_text,
     plg->lg_series = g_list_append (plg->lg_series, psd);
     psd->i_series_id = plg->i_num_series++;
 
-    if (lg_graph_debug)
-    {
+    if (lg_graph_debug) {
         g_print ("DataSeriesAdd: series=%d, max_pts=%d\n",
                  psd->i_series_id, psd->i_max_points);
     }
-
     return psd->i_series_id;
 }
 
@@ -500,11 +522,11 @@ static void lg_graph_set_chart_title_color (PLGRAPH plg, gchar * pch_color)
     g_return_if_fail (plg != NULL);
     g_snprintf (plg->ch_color_title_fg, sizeof (plg->ch_color_title_fg), "%s", pch_color);
 }
-static void lg_graph_redraw (PLGRAPH plg)
+static void lg_graph_redraw (PLGRAPH plg) // XXX TODO remove, queue draw event instead
 {
-   GtkAllocation  allocation;
-   GdkRectangle   update_rect;
-   GdkRegion     *region = NULL;
+   GtkAllocation   allocation;
+   GdkRectangle    update_rect;
+   cairo_region_t *region = NULL;
 
    g_return_if_fail (plg != NULL);
 
@@ -515,9 +537,9 @@ static void lg_graph_redraw (PLGRAPH plg)
    update_rect.height = allocation.height;
 
    /* --- And then draw it (calls expose event) --- */
-   region = gdk_region_rectangle (&update_rect);
+   region = cairo_region_create_rectangle (&update_rect);
    gdk_window_invalidate_region (gtk_widget_get_window (plg->drawing_area), region, FALSE);
-   gdk_region_destroy (region);
+   g_clear_pointer (&region, cairo_region_destroy);
 }
 
 /*
@@ -554,56 +576,65 @@ static gboolean lg_graph_button_press_event_cb (GtkWidget * widget,
  * Track the mouse pointer position
  * "motion-notify-event"
 */
-static gboolean lg_graph_motion_notify_event_cb (GtkWidget * widget,
-                                                 GdkEventMotion * ev, PLGRAPH plg)
+static gboolean lg_graph_motion_notify_event_cb (
+   GtkWidget      *widget,
+   GdkEventMotion *ev,
+   PLGRAPH         plg)
 {
-    GdkModifierType state;
-    gint        x = 0, y = 0;
+   GdkDevice       *device = NULL;
+   GdkDisplay      *display = NULL;
+   GdkSeat         *seat = NULL;
+   GdkModifierType  state;
+   gint             x = 0, y = 0;
 
-    g_return_val_if_fail (plg != NULL, FALSE);
+   g_return_val_if_fail (plg != NULL, FALSE);
 
-    if (ev->is_hint)
-    {
-        gdk_window_get_pointer (ev->window, &x, &y, &state);
-    }
-    else
-    {
-        x = ev->x;
-        y = ev->y;
-        state = ev->state;
-    }
-
-    plg->mouse_pos.x = x;
-    plg->mouse_pos.y = y;
-    plg->mouse_state = state;
-
-    if ( lg_graph_draw_tooltip (plg) ) {
-         lg_graph_redraw (plg);
-    }
-
-    if (lg_graph_debug)
-    {
-        g_print ("mouse is at x=%d, y=%d, with a state of %d\n", x, y, state);
-    }
-
-    return FALSE;
+   if (ev->is_hint) {
+      display = gtk_widget_get_display (widget);
+      seat = gdk_display_get_default_seat(display);
+      device = gdk_seat_get_pointer(seat);
+      gdk_window_get_device_position (
+         ev->window,
+         device,
+         &x, &y,
+         &state);
+   }
+   else {
+      x = ev->x;
+      y = ev->y;
+      state = ev->state;
+   }
+   plg->mouse_pos.x = x;
+   plg->mouse_pos.y = y;
+   plg->mouse_state = state;
+/* XXX
+   if ( lg_graph_draw_tooltip (plg) ) { // XXX FIXME ... has-tooltip property and query-tooltip signal
+      lg_graph_redraw (plg);
+   }
+*/
+   if (lg_graph_debug) {
+      g_print ("mouse is at x=%d, y=%d, with a state of %d\n", x, y, state);
+   }
+   return FALSE;
 }
 
 /*
  * Draw the chart x scale legend
 */
-static void lg_graph_draw_x_grid_labels (PLGRAPH plg)
+static void lg_graph_draw_x_grid_labels (
+   cairo_t *graph_cr,
+   PLGRAPH  plg)
 {
    gchar          ch_grid_label[GAPC_MAX_BUFFER];
    gchar          ch_work[GAPC_MAX_BUFFER];
-   GdkColor       color;
+   GdkRGBA        color;
    PangoLayout   *layout = NULL;
    PangoTabArray *p_tabs = NULL;
    gint           x_adj = 0, x1_adj = 0, width = 0, height = 0, h_index = 0, x_scale = 0;
 
    g_return_if_fail (plg != NULL);
 
-   layout = pango_cairo_create_layout (plg->graph_cr);
+   layout = pango_cairo_create_layout (graph_cr);
    g_snprintf (ch_grid_label, GAPC_MAX_BUFFER, "<span size=\"x-small\"><tt>%d</tt></span>",
                plg->x_range.i_max_scale);
 
@@ -648,15 +679,15 @@ static void lg_graph_draw_x_grid_labels (PLGRAPH plg)
        pango_tab_array_set_tab (p_tabs, h_index, PANGO_TAB_LEFT, xbase);
    }
    pango_layout_set_tabs (layout, p_tabs);
-   pango_cairo_update_layout (plg->graph_cr, layout);
+   pango_cairo_update_layout (graph_cr, layout);
 
-   gdk_color_parse (plg->ch_color_scale_fg, &color);
-   gdk_cairo_set_source_color (plg->graph_cr, &color);
+   gdk_rgba_parse (&color, plg->ch_color_scale_fg);
+   gdk_cairo_set_source_rgba (graph_cr, &color);
    cairo_move_to (
-      plg->graph_cr,
+      graph_cr,
       (gdouble)plg->plot_box.x - (gdouble)x_adj,
       (gdouble)plg->plot_box.y + (gdouble)plg->plot_box.height);
-   pango_cairo_show_layout (plg->graph_cr, layout);
+   pango_cairo_show_layout (graph_cr, layout);
    pango_tab_array_free (p_tabs);
    g_clear_object (&layout);
 
@@ -666,17 +697,19 @@ static void lg_graph_draw_x_grid_labels (PLGRAPH plg)
 /*
  * Draw the chart y scale legend
 */
-static void lg_graph_draw_y_grid_labels (PLGRAPH plg)
+static void lg_graph_draw_y_grid_labels (
+   cairo_t *graph_cr,
+   PLGRAPH  plg)
 {
    gchar        ch_grid_label[GAPC_MAX_BUFFER];
    gchar        ch_work[GAPC_MAX_BUFFER];
-   GdkColor     color;
+   GdkRGBA      color;
    PangoLayout *layout = NULL;
    gint         y_adj = 0, width = 0, height = 0, v_index = 0;
 
    g_return_if_fail (plg != NULL);
 
-   layout = pango_cairo_create_layout (plg->graph_cr);
+   layout = pango_cairo_create_layout (graph_cr);
    g_snprintf (
       ch_grid_label,
       GAPC_MAX_BUFFER,
@@ -715,15 +748,15 @@ static void lg_graph_draw_y_grid_labels (PLGRAPH plg)
       g_print ("(%d:%d)y_Labels=[%s]\n", y_adj, plg->y_range.i_major_inc,
                ch_grid_label);
    }
-   pango_cairo_update_layout (plg->graph_cr, layout);
+   pango_cairo_update_layout (graph_cr, layout);
 
-   gdk_color_parse (plg->ch_color_scale_fg, &color);
-   gdk_cairo_set_source_color (plg->graph_cr, &color);
+   gdk_rgba_parse (&color, plg->ch_color_scale_fg);
+   gdk_cairo_set_source_rgba (graph_cr, &color);
    cairo_move_to (
-      plg->graph_cr,
+      graph_cr,
       (gdouble)plg->plot_box.x - ((gdouble)width * 1.2),
       (gdouble)plg->plot_box.y - (gdouble)y_adj);
-   pango_cairo_show_layout (plg->graph_cr, layout);
+   pango_cairo_show_layout (graph_cr, layout);
 
    g_clear_object (&layout);
 
@@ -734,9 +767,11 @@ static void lg_graph_draw_y_grid_labels (PLGRAPH plg)
  * Draws the minor and major grid lines inside the current plot_area
  * returns -1 on error, or TRUE;
 */
-static gint lg_graph_draw_grid_lines (PLGRAPH plg)
+static gint lg_graph_draw_grid_lines (
+   cairo_t *graph_cr,
+   PLGRAPH  plg)
 {
-   GdkColor    color;
+   GdkRGBA     color;
    GtkWidget  *drawing_area = NULL;
    gint        y_minor_inc = 0, y_pos = 0, y_index = 0;
    gint        y_major_inc = 0;
@@ -761,33 +796,33 @@ static gint lg_graph_draw_grid_lines (PLGRAPH plg)
    }
    x_pos = plg->plot_box.width;
    y_pos = plg->plot_box.y;
-   gdk_color_parse (plg->ch_color_window_bg, &color);
-   gdk_cairo_set_source_color (plg->graph_cr, &color);
-   cairo_set_line_cap (plg->graph_cr, CAIRO_LINE_CAP_BUTT);
+   gdk_rgba_parse (&color, plg->ch_color_window_bg);
+   gdk_cairo_set_source_rgba (graph_cr, &color);
+   cairo_set_line_cap (graph_cr, CAIRO_LINE_CAP_BUTT);
 
-   cairo_set_line_width (plg-> graph_cr, 1.0);
+   cairo_set_line_width (graph_cr, 1.0);
 
    for (y_index = 0; y_index < count_minor; y_index++) {
       cairo_move_to (
-         plg->graph_cr,
+         graph_cr,
          (gdouble)plg->plot_box.x, (gdouble)(y_pos + (y_minor_inc * (y_index + 1))));
       cairo_rel_line_to (
-         plg->graph_cr,
+         graph_cr,
          (gdouble)x_pos - 2.0, 0.0);
    }
-   cairo_stroke(plg->graph_cr);
+   cairo_stroke(graph_cr);
 
-   cairo_set_line_width (plg-> graph_cr, 2.0);
+   cairo_set_line_width (graph_cr, 2.0);
 
    for (y_index = 0; y_index < count_major; y_index++) {
       cairo_move_to (
-         plg->graph_cr,
+         graph_cr,
          (gdouble)plg->plot_box.x, (gdouble)(y_pos + (y_major_inc * (y_index + 1))));
       cairo_rel_line_to (
-         plg->graph_cr,
+         graph_cr,
          (gdouble)x_pos - 2.0, 0.0);
    }
-   cairo_stroke(plg->graph_cr);
+   cairo_stroke(graph_cr);
 
    count_major = plg->x_range.i_num_major;
    count_minor = plg->x_range.i_num_minor;
@@ -802,31 +837,47 @@ static gint lg_graph_draw_grid_lines (PLGRAPH plg)
    x_pos = plg->plot_box.x;
    y_pos = plg->plot_box.height;
 
-   cairo_set_line_width (plg-> graph_cr, 1.0);
+   cairo_set_line_width (graph_cr, 1.0);
 
    for (x_index = 0; x_index < count_minor; x_index++) {
       cairo_move_to (
-         plg->graph_cr,
+         graph_cr,
          (gdouble)(plg->plot_box.x + (x_minor_inc * (x_index + 1))), (gdouble)plg->plot_box.y);
       cairo_rel_line_to (
-         plg->graph_cr,
+         graph_cr,
          0.0, (gdouble)(y_pos));
    }
-   cairo_stroke(plg->graph_cr);
+   cairo_stroke(graph_cr);
 
-   cairo_set_line_width (plg-> graph_cr, 2.0);
+   cairo_set_line_width (graph_cr, 2.0);
 
    for (x_index = 0; x_index < count_major; x_index++) {
       cairo_move_to (
-         plg->graph_cr,
+         graph_cr,
          (gdouble)(plg->plot_box.x + (x_major_inc * (x_index + 1))), (gdouble)plg->plot_box.y);
       cairo_rel_line_to (
-         plg->graph_cr,
+         graph_cr,
          0.0, (gdouble)(y_pos));
    }
-   cairo_stroke(plg->graph_cr);
+   cairo_stroke(graph_cr);
 
    return TRUE;
+}
+
+static gchar *gapc_rgba_to_pango_color(gchar *rgba_string) {
+   GdkRGBA  color;
+   gchar   *pango_color = NULL;
+
+   if (gdk_rgba_parse(&color, rgba_string)) {
+      pango_color = g_strdup_printf (
+         "#%02x%02x%02x",
+         (guint)(color.red   * 255.0 + 0.5),
+         (guint)(color.green * 255.0 + 0.5),
+         (guint)(color.blue  * 255.0 + 0.5));
+   } else {
+      pango_color = g_strdup("#000000");
+   }
+   return pango_color;
 }
 
 /*
@@ -834,16 +885,19 @@ static gint lg_graph_draw_grid_lines (PLGRAPH plg)
  * returns the width of the text area, or -1 on error
  * requires plg->b_tooltip_active to be TRUE, (toggled by mouse)
 */
-static gint lg_graph_draw_tooltip (PLGRAPH plg)
+static gint lg_graph_draw_tooltip (
+   cairo_t *graph_cr,
+   PLGRAPH  plg)
 {
-   PangoLayout *layout = NULL;
-   gint        x_pos = 0, y_pos = 0, width = 0, height = 0;
-   gint        v_index = 0, x_adj = 0;
-   PLG_SERIES  psd = NULL;
-   GList      *data_sets = NULL;
-   GdkColor    color;
-   GdkRegion  *region = NULL;
-   gboolean    b_found = FALSE;
+   PangoLayout    *layout = NULL;
+   gint            x_pos = 0, y_pos = 0, width = 0, height = 0;
+   gint            v_index = 0, x_adj = 0;
+   PLG_SERIES      psd = NULL;
+   GList          *data_sets = NULL;
+   GdkRGBA         color;
+   gchar          *pango_color = NULL;
+   cairo_region_t *region = NULL;
+   gboolean        b_found = FALSE;
 
    g_return_val_if_fail (plg != NULL, -1);
    g_return_val_if_fail (gtk_widget_is_drawable(plg->drawing_area), -1);
@@ -857,16 +911,16 @@ static gint lg_graph_draw_tooltip (PLGRAPH plg)
 
    /*
     * Create tooltip if needed */
-   region = gdk_region_rectangle (&plg->plot_box);
+   region = cairo_region_create_rectangle (&plg->plot_box);
    x_adj = (plg->x_range.i_minor_inc / plg->x_range.i_inc_minor_scale_by);
 
    /*
     * see if ptr is at a x-range point */
-   if (!gdk_region_point_in (region, plg->mouse_pos.x, plg->mouse_pos.y)) {
-      gdk_region_destroy (region);
+   if (!cairo_region_contains_point (region, plg->mouse_pos.x, plg->mouse_pos.y)) {
+      g_clear_pointer (&region, cairo_region_destroy);
       return -1;
    }
-   gdk_region_destroy (region);
+   g_clear_pointer (&region, cairo_region_destroy);
 
    for (v_index = 0; v_index <= plg->x_range.i_max_scale; v_index++) {
         x_pos = plg->plot_box.x + (v_index * x_adj);
@@ -903,12 +957,14 @@ static gint lg_graph_draw_tooltip (PLGRAPH plg)
       while (data_sets) {
          psd = data_sets->data;
          if (psd != NULL) {                   /* found */
+            pango_color = gapc_rgba_to_pango_color (psd->ch_legend_color);
             g_snprintf (ch_work, sizeof (ch_work), "%s", ch_buffer);
             g_snprintf (ch_buffer, sizeof (ch_buffer),
                         "%s{%3.0f%% <span fgcolor=\"%s\">%s</span>}",
                         ch_work,
                         psd->lg_point_dvalue[v_index],
-                        psd->ch_legend_color, psd->ch_legend_text);
+                        pango_color, psd->ch_legend_text);
+            g_clear_pointer (&pango_color, g_free);
          }
          data_sets = g_list_next (data_sets);
       }
@@ -923,7 +979,7 @@ static gint lg_graph_draw_tooltip (PLGRAPH plg)
    if (!b_found) {
       return -1;
    }
-   layout = pango_cairo_create_layout (plg->graph_cr);
+   layout = pango_cairo_create_layout (graph_cr);
    pango_layout_set_alignment (layout, PANGO_ALIGN_CENTER);
 
    pango_layout_set_markup (layout, plg->ch_tooltip_text, -1);
@@ -933,33 +989,33 @@ static gint lg_graph_draw_tooltip (PLGRAPH plg)
    x_pos = plg->x_tooltip.x + ((plg->x_tooltip.width - width) / 2);
    y_pos = plg->x_tooltip.y + ((plg->x_tooltip.height - height) / 2);
 
-   gdk_color_parse (plg->ch_color_window_bg, &color);
-   gdk_cairo_set_source_color (plg->graph_cr, &color);
+   gdk_rgba_parse (&color, plg->ch_color_window_bg);
+   gdk_cairo_set_source_rgba (graph_cr, &color);
    cairo_rectangle (
-      plg->graph_cr,
+      graph_cr,
       (gdouble)plg->x_tooltip.x,
       (gdouble)plg->x_tooltip.y,
       (gdouble)plg->x_tooltip.width,
       (gdouble)plg->x_tooltip.height);
-   cairo_fill(plg->graph_cr);
-   gdk_color_parse (plg->ch_color_chart_bg, &color);
-   gdk_cairo_set_source_color (plg->graph_cr, &color);
+   cairo_fill(graph_cr);
+   gdk_rgba_parse (&color, plg->ch_color_chart_bg);
+   gdk_cairo_set_source_rgba (graph_cr, &color);
    cairo_rectangle (
-      plg->graph_cr,
+      graph_cr,
       (gdouble)plg->x_tooltip.x,
       (gdouble)plg->x_tooltip.y,
       (gdouble)plg->x_tooltip.width,
       (gdouble)plg->x_tooltip.height);
-   cairo_stroke(plg->graph_cr);
-   pango_cairo_update_layout (plg->graph_cr, layout);
+   cairo_stroke(graph_cr);
+   pango_cairo_update_layout (graph_cr, layout);
 
-   gdk_color_parse (plg->ch_color_scale_fg, &color);
-   gdk_cairo_set_source_color (plg->graph_cr, &color);
+   gdk_rgba_parse (&color, plg->ch_color_scale_fg);
+   gdk_cairo_set_source_rgba (graph_cr, &color);
    cairo_move_to(
-      plg->graph_cr,
+      graph_cr,
       (gdouble)x_pos,
       (gdouble)y_pos);
-   pango_cairo_show_layout (plg->graph_cr, layout);
+   pango_cairo_show_layout (graph_cr, layout);
 
    g_clear_object (&layout);
 
@@ -975,12 +1031,14 @@ static gint lg_graph_draw_tooltip (PLGRAPH plg)
  * sets the width, height values of the input rectangle to the size of textbox
  * returns the height of the text area, or -1 on error
 */
-static gint lg_graph_draw_vertical_text (PLGRAPH plg,
-                                         gchar * pch_text,
-                                         GdkRectangle * rect,
-                                         gboolean redraw_control)
+static gint lg_graph_draw_vertical_text (
+   cairo_t      *graph_cr,
+   PLGRAPH       plg,
+   gchar        *pch_text,
+   GdkRectangle *rect,
+   gboolean      redraw_control)
 {
-   GdkColor              color;
+   GdkRGBA               color;
    PangoFontDescription *font_desc = NULL;
    PangoLayout          *layout = NULL;
    gint                  y_pos = 0;
@@ -991,21 +1049,21 @@ static gint lg_graph_draw_vertical_text (PLGRAPH plg,
    g_return_val_if_fail (gtk_widget_is_drawable(plg->drawing_area), -1);
 
    if (rect->width && redraw_control) {
-      gdk_color_parse (plg->ch_color_window_bg, &color);
-      gdk_cairo_set_source_color (plg->graph_cr, &color);
+      gdk_rgba_parse (&color, plg->ch_color_window_bg);
+      gdk_cairo_set_source_rgba (graph_cr, &color);
       cairo_rectangle (
-         plg->graph_cr,
+         graph_cr,
          (gdouble)rect->x,
          (gdouble)rect->y,
          (gdouble)rect->width,
          (gdouble)rect->height);
-      cairo_fill (plg->graph_cr);
+      cairo_fill (graph_cr);
    }
-   cairo_save(plg->graph_cr);
+   cairo_save(graph_cr);
 
    font_desc = pango_font_description_new();
    pango_font_description_set_family_static (font_desc, "Mono");
-   layout = pango_cairo_create_layout (plg->graph_cr);
+   layout = pango_cairo_create_layout (graph_cr);
    pango_layout_set_font_description (layout, font_desc);
    pango_layout_set_markup (layout, pch_text, -1);
    pango_layout_set_alignment (layout, PANGO_ALIGN_CENTER);
@@ -1013,32 +1071,32 @@ static gint lg_graph_draw_vertical_text (PLGRAPH plg,
    pango_layout_get_pixel_size (layout, &rect->width, &rect->height);
    y_pos = rect->y + plg->plot_box.height - ((plg->plot_box.height - rect->width) / 2);
 
-   gdk_color_parse (plg->ch_color_title_fg, &color);
-   gdk_cairo_set_source_color (plg->graph_cr, &color);
+   gdk_rgba_parse (&color, plg->ch_color_title_fg);
+   gdk_cairo_set_source_rgba (graph_cr, &color);
    cairo_move_to (
-      plg->graph_cr,
+      graph_cr,
       0.0,
       (gdouble)y_pos);
-   cairo_rotate(plg->graph_cr, -G_PI / 2.0);
-   pango_cairo_update_layout (plg->graph_cr, layout);
-   pango_cairo_show_layout (plg->graph_cr, layout);
+   cairo_rotate(graph_cr, -G_PI / 2.0);
+   pango_cairo_update_layout (graph_cr, layout);
+   pango_cairo_show_layout (graph_cr, layout);
 
    /* free the objects we created */
    g_clear_object (&layout);
    g_clear_pointer (&font_desc, pango_font_description_free);
 
-   cairo_restore(plg->graph_cr);
+   cairo_restore(graph_cr);
 
    if (lg_graph_debug) {
       g_print ("Vertical Label: x=%d, y=%d Width=%d, Height=%d Text:%s\n",
                rect->x, rect->y, rect->width, rect->height, pch_text);
    }
    if (redraw_control) {
-      GdkRegion  *region = NULL;
+      cairo_region_t *region = NULL;
 
-      region = gdk_region_rectangle (rect);
+      region = cairo_region_create_rectangle (rect);
       gdk_window_invalidate_region (gtk_widget_get_window (plg->drawing_area), region, FALSE);
-      gdk_region_destroy (region);
+      g_clear_pointer (&region, cairo_region_destroy);
    }
    return rect->height;
 }
@@ -1049,12 +1107,14 @@ static gint lg_graph_draw_vertical_text (PLGRAPH plg,
  * returns the width of the text area, or -1 on error
  * redraw_control = 1 causes an expose_event, 0 or != 1 does not
 */
-static gint lg_graph_draw_horizontal_text (PLGRAPH plg,
-                                           gchar * pch_text,
-                                           GdkRectangle * rect,
-                                           gboolean redraw_control)
+static gint lg_graph_draw_horizontal_text (
+   cairo_t      *graph_cr,
+   PLGRAPH       plg,
+   gchar        *pch_text,
+   GdkRectangle *rect,
+   gboolean      redraw_control)
 {
-   GdkColor              color;
+   GdkRGBA               color;
    PangoFontDescription *font_desc = NULL;
    PangoLayout          *layout = NULL;
    gint                 x_pos = 0;
@@ -1065,34 +1125,34 @@ static gint lg_graph_draw_horizontal_text (PLGRAPH plg,
    g_return_val_if_fail (gtk_widget_is_drawable(plg->drawing_area), -1);
 
    if (rect->width && redraw_control) {
-      gdk_color_parse (plg->ch_color_window_bg, &color);
-      gdk_cairo_set_source_color (plg->graph_cr, &color);
+      gdk_rgba_parse (&color, plg->ch_color_window_bg);
+      gdk_cairo_set_source_rgba (graph_cr, &color);
       cairo_rectangle (
-         plg->graph_cr,
+         graph_cr,
          (gdouble)rect->x,
          (gdouble)rect->y,
          (gdouble)rect->width,
          (gdouble)rect->height);
-      cairo_fill (plg->graph_cr);
+      cairo_fill (graph_cr);
    }
    font_desc = pango_font_description_new();
    pango_font_description_set_family_static (font_desc, "Mono");
-   layout = pango_cairo_create_layout (plg->graph_cr);
+   layout = pango_cairo_create_layout (graph_cr);
    pango_layout_set_font_description (layout, font_desc);
    pango_layout_set_markup (layout, pch_text, -1);
    pango_layout_set_alignment (layout, PANGO_ALIGN_CENTER);
    pango_layout_get_pixel_size (layout, &rect->width, &rect->height);
-   pango_cairo_update_layout (plg->graph_cr, layout);
+   pango_cairo_update_layout (graph_cr, layout);
 
    x_pos = rect->x + ((plg->plot_box.width - rect->width) / 2);
 
-   gdk_color_parse (plg->ch_color_title_fg, &color);
-   gdk_cairo_set_source_color (plg->graph_cr, &color);
+   gdk_rgba_parse (&color, plg->ch_color_title_fg);
+   gdk_cairo_set_source_rgba (graph_cr, &color);
    cairo_move_to (
-      plg->graph_cr,
+      graph_cr,
       (gdouble)x_pos,
       (gdouble)rect->y);
-   pango_cairo_show_layout (plg->graph_cr, layout);
+   pango_cairo_show_layout (graph_cr, layout);
 
    g_clear_object (&layout);
    g_clear_pointer (&font_desc, pango_font_description_free);
@@ -1103,11 +1163,11 @@ static gint lg_graph_draw_horizontal_text (PLGRAPH plg,
 
    }
    if (redraw_control) {
-      GdkRegion  *region = NULL;
+      cairo_region_t *region = NULL;
 
-      region = gdk_region_rectangle (rect);
+      region = cairo_region_create_rectangle (rect);
       gdk_window_invalidate_region (gtk_widget_get_window (plg->drawing_area), region, FALSE);
-      gdk_region_destroy (region);
+      g_clear_pointer (&region, cairo_region_destroy);
    }
    return rect->width;
 }
@@ -1173,28 +1233,27 @@ static void lg_graph_set_ranges (PLGRAPH plg,
  *
  * data - widget to repaint
  */
-static gboolean lg_graph_draw (PLGRAPH plg)
+static gboolean lg_graph_draw (
+   cairo_t *graph_cr,
+   PLGRAPH  plg)
 {
    GtkAllocation  allocation;
-   GdkColor       color;
+   GdkRGBA        color;
    GtkWidget     *drawing_area = NULL;
-   cairo_t       *graph_cr = NULL;
 
    g_return_val_if_fail (plg != NULL, G_SOURCE_CONTINUE);
 
    drawing_area = plg->drawing_area;
 
-   if ( !(gtk_widget_is_drawable(drawing_area)) ) {
-      return G_SOURCE_CONTINUE;
-   }
-   graph_cr = plg->graph_cr;
+   cairo_set_antialias (graph_cr, CAIRO_ANTIALIAS_FAST);
+   cairo_set_line_cap (graph_cr, CAIRO_LINE_CAP_SQUARE);
 
    /*
     * Clear the whole area
     */
    gtk_widget_get_allocation (drawing_area, &allocation);
-   gdk_color_parse (plg->ch_color_window_bg, &color);
-   gdk_cairo_set_source_color (graph_cr, &color);
+   gdk_rgba_parse (&color, plg->ch_color_window_bg);
+   gdk_cairo_set_source_rgba (graph_cr, &color);
    cairo_rectangle (
       graph_cr,
       0.0,
@@ -1206,8 +1265,8 @@ static gboolean lg_graph_draw (PLGRAPH plg)
    /*
     * draw plot area
     */
-   gdk_color_parse (plg->ch_color_chart_bg, &color);
-   gdk_cairo_set_source_color (graph_cr, &color);
+   gdk_rgba_parse (&color, plg->ch_color_chart_bg);
+   gdk_cairo_set_source_rgba (graph_cr, &color);
    cairo_rectangle (
       graph_cr,
       (gdouble)plg->plot_box.x,
@@ -1216,7 +1275,7 @@ static gboolean lg_graph_draw (PLGRAPH plg)
       (gdouble)plg->plot_box.height);
    cairo_fill ( graph_cr);
 
-   lg_graph_draw_grid_lines (plg);
+   lg_graph_draw_grid_lines (graph_cr, plg);
 
    cairo_set_line_cap (graph_cr, CAIRO_LINE_CAP_SQUARE);
    cairo_set_source_rgb (graph_cr, 0.0, 0.0, 0.0);
@@ -1239,93 +1298,50 @@ static gboolean lg_graph_draw (PLGRAPH plg)
    /*
     * draw titles
     */
-   lg_graph_draw_horizontal_text (plg, plg->x_title_text, &plg->x_title, FALSE);
+   lg_graph_draw_horizontal_text (graph_cr, plg, plg->x_title_text, &plg->x_title, FALSE);
 
-   lg_graph_draw_horizontal_text (plg, plg->x_label_text, &plg->x_label, FALSE);
+   lg_graph_draw_horizontal_text (graph_cr, plg, plg->x_label_text, &plg->x_label, FALSE);
 
-   lg_graph_draw_vertical_text (plg, plg->y_label_text, &plg->y_label, FALSE);
+   lg_graph_draw_vertical_text (graph_cr, plg, plg->y_label_text, &plg->y_label, FALSE);
 
-   lg_graph_draw_x_grid_labels (plg);
+   lg_graph_draw_x_grid_labels (graph_cr, plg);
 
-   lg_graph_draw_y_grid_labels (plg);
+   lg_graph_draw_y_grid_labels (graph_cr, plg);
 
-   lg_graph_data_series_draw_all (plg, FALSE);
+   lg_graph_data_series_draw_all (graph_cr, plg, FALSE);
 
-   lg_graph_draw_tooltip (plg);
+   lg_graph_draw_tooltip (graph_cr, plg);
 
-   /* The entire pixmap is going to be copied
+   /* The entire surface is going to be copied
     *     onto the window so the rect is configured
     *     as the size of the window.
     */
-   lg_graph_redraw (plg);
+   lg_graph_redraw (plg); // XXX SHOULD NOT BE NECESSARY IF CALLED FROM DRAW CALLBACK
 
    return G_SOURCE_REMOVE;
-}
-
-static gboolean gapc_timeout_drawing_area_configure(PLGRAPH plg)
-{
-   gboolean return_value;
-
-   return_value = lg_graph_draw(plg);
-   if (return_value == G_SOURCE_REMOVE) {
-      plg->tid_configure = 0;
-   }
-   return return_value;
 }
 
 /*
  * configure_event
  *
- * Create a new backing pixmap of the appropriate size
+ * Recalculate positions and sizes.
  * Of course, this is called whenever the window is
- * resized.  We have to free up things we allocated.
+ * resized.
  */
-static gboolean lg_graph_configure_event_cb (GtkWidget * widget,
-                                             GdkEventConfigure * event,
-                                             PLGRAPH plg)
+static gboolean lg_graph_configure_event_cb (
+   GtkWidget         *widget,
+   GdkEventConfigure *event,
+   PLGRAPH            plg)
 {
    GtkAllocation allocation;
-   GdkColor      color;
-   GdkRectangle  clip_area;
+   GdkRGBA       color;
    gint          xfactor = 0;
    gint          yfactor = 0;
 
-   /* --- Free background if we created it --- */
-   if (plg->graph_surface != NULL) {
-      g_clear_pointer(&plg->graph_surface, cairo_surface_destroy);
-   }
-
-   /* --- Create a new pixmap with new size --- */
    gtk_widget_get_allocation (widget, &allocation);
-   plg->graph_surface = cairo_image_surface_create (
-      CAIRO_FORMAT_ARGB32,
-      allocation.width,
-      allocation.height);
-
-   if (plg->graph_cr != NULL) {
-      g_clear_pointer(&plg->graph_cr, cairo_destroy);
-   }
-   plg->graph_cr = cairo_create (plg->graph_surface);
-   cairo_set_antialias (plg->graph_cr, CAIRO_ANTIALIAS_FAST);
-   cairo_set_line_cap (plg->graph_cr, CAIRO_LINE_CAP_SQUARE);
-
-   gdk_color_parse (plg->ch_color_window_bg, &color);
-   gdk_cairo_set_source_color (plg->graph_cr, &color);
-   cairo_rectangle (
-      plg->graph_cr,
-      0.0,
-      0.0,
-      (gdouble)allocation.width,
-      (gdouble)allocation.height);
-   cairo_fill(plg->graph_cr);
 
    plg->width = allocation.width;
    plg->height = allocation.height;
-
-   clip_area.x = 0;
-   clip_area.y = 0;
-   clip_area.width = allocation.width;
-   clip_area.height = allocation.height;
 
    xfactor = MAX (plg->x_range.i_num_minor, plg->x_range.i_num_major);
    yfactor = MAX (plg->y_range.i_num_minor, plg->y_range.i_num_major);
@@ -1367,46 +1383,24 @@ static gboolean lg_graph_configure_event_cb (GtkWidget * widget,
    plg->x_range.i_minor_inc = plg->plot_box.width / plg->x_range.i_num_minor;
    plg->x_range.i_major_inc = plg->plot_box.width / plg->x_range.i_num_major;
 
-   if (plg->tid_configure != 0) {
-      if (g_source_remove(plg->tid_configure)) {
-         plg->tid_configure = 0;
-      }
-   }
-   plg->tid_configure = g_timeout_add(
-      250,
-      G_SOURCE_FUNC(gapc_timeout_drawing_area_configure),
-      plg);
-
    return TRUE;
 }
 
 /*
- * expose_event
+ * draw signal callback
  *
- * When the window is exposed to the viewer or
+ * When the widget is supposed to render itself or
  * the gdk_widget_draw routine is called, this
- * routine is called.  Copies the background pixmap
- * to the window.
+ * routine is called.
  */
-static gint lg_graph_expose_event_cb (GtkWidget * widget, GdkEventExpose * event,
-                                      PLGRAPH plg)
+static gint lg_graph_draw_cb (
+   GtkWidget * widget,
+   cairo_t* drawing_area_cr,
+   PLGRAPH plg)
 {
-   g_return_val_if_fail (GDK_IS_DRAWABLE (gtk_widget_get_window (widget)), FALSE);
-
-   /* --- Copy surface to the window --- */
-   cairo_t *drawing_area_cr = gdk_cairo_create (gtk_widget_get_window (widget));
-   cairo_set_source_surface (
+   lg_graph_draw (
       drawing_area_cr,
-      plg->graph_surface,
-      0.0,
-      0.0);
-   cairo_rectangle (
-      drawing_area_cr,
-      event->area.x, event->area.y,
-      event->area.width, event->area.height);
-   cairo_clip (drawing_area_cr);
-   cairo_paint (drawing_area_cr);
-   g_clear_pointer (&drawing_area_cr, cairo_destroy);
+      plg);
 
    return FALSE;
 }
@@ -1653,7 +1647,7 @@ static gboolean cb_monitor_dedicated_one_time_refresh(PGAPC_MONITOR pm)
       return G_SOURCE_REMOVE;
    }
 
-   if (!g_mutex_trylock(pm->gm_update)) {
+   if (!g_mutex_trylock(&pm->gm_update)) {
       w = g_hash_table_lookup(pm->pht_Widgets, "StatusBar");
       if (w != NULL) {
          gtk_statusbar_pop(GTK_STATUSBAR(w), pm->i_info_context);
@@ -1664,8 +1658,6 @@ static gboolean cb_monitor_dedicated_one_time_refresh(PGAPC_MONITOR pm)
       }
       return G_SOURCE_CONTINUE;    /* thread must be busy */
    }
-
-   gdk_threads_enter();
 
    w = g_hash_table_lookup(pm->pht_Widgets, "StatusBar");
    if (w != NULL) {
@@ -1682,9 +1674,10 @@ static gboolean cb_monitor_dedicated_one_time_refresh(PGAPC_MONITOR pm)
          g_clear_pointer(&pch1, g_free);
       }
       if (pm->i_netbusy_counter++ % 10) {       /* Fall thru and quit after ten tries */
-         g_mutex_unlock(pm->gm_update);
-         gdk_flush();
-         gdk_threads_leave();
+         g_mutex_unlock(&pm->gm_update);
+         if (w != NULL) {
+            gdk_display_flush(gtk_widget_get_display(w));
+         }
          return G_SOURCE_CONTINUE; /* try again */
       }
    }
@@ -1695,9 +1688,10 @@ static gboolean cb_monitor_dedicated_one_time_refresh(PGAPC_MONITOR pm)
       g_clear_pointer(&pch1, g_free);
    }
 
-   g_mutex_unlock(pm->gm_update);
-   gdk_flush();
-   gdk_threads_leave();
+   g_mutex_unlock(&pm->gm_update);
+   if (w != NULL) {
+      gdk_display_flush(gtk_widget_get_display(w));
+   }
 
    return G_SOURCE_REMOVE;         /* this will terminate the timer */
 }
@@ -1723,7 +1717,7 @@ static gboolean cb_monitor_automatic_refresh(PGAPC_MONITOR pm)
       return G_SOURCE_REMOVE;
    }
 
-   if (!g_mutex_trylock(pm->gm_update)) {
+   if (!g_mutex_trylock(&pm->gm_update)) {
       w = g_hash_table_lookup(pm->pht_Widgets, "StatusBar");
       if (w != NULL) {
          gtk_statusbar_pop(GTK_STATUSBAR(w), pm->i_info_context);
@@ -1734,8 +1728,6 @@ static gboolean cb_monitor_automatic_refresh(PGAPC_MONITOR pm)
       }
       return G_SOURCE_CONTINUE;    /* thread must be busy */
    }
-
-   gdk_threads_enter();
 
    w = g_hash_table_lookup(pm->pht_Widgets, "StatusBar");
    if (w != NULL) {
@@ -1758,9 +1750,10 @@ static gboolean cb_monitor_automatic_refresh(PGAPC_MONITOR pm)
          g_clear_pointer(&pch1, g_free);
       }
       if (pm->i_netbusy_counter++ % 10) {       /* fall thru every tenth time to queue a message */
-         g_mutex_unlock(pm->gm_update);
-         gdk_flush();
-         gdk_threads_leave();
+         g_mutex_unlock(&pm->gm_update);
+         if (w != NULL) {
+            gdk_display_flush(gtk_widget_get_display(w));
+         }
 
          return G_SOURCE_CONTINUE;
       }
@@ -1770,9 +1763,10 @@ static gboolean cb_monitor_automatic_refresh(PGAPC_MONITOR pm)
     * This is the work request to network queue */
    g_async_queue_push(pm->q_network, (gpointer) pm);
 
-   g_mutex_unlock(pm->gm_update);
-   gdk_flush();
-   gdk_threads_leave();
+   g_mutex_unlock(&pm->gm_update);
+   if (w != NULL) {
+      gdk_display_flush(gtk_widget_get_display(w));
+   }
 
    return G_SOURCE_CONTINUE;
 }
@@ -2021,7 +2015,7 @@ static gboolean gapc_monitor_update_tooltip_msg(PGAPC_MONITOR pm)
       lg_graph_set_chart_title (pm->phs.plg, ptitle);
       g_snprintf(pm->ch_title_info, GAPC_MAX_TEXT, "%s", ptitle);
 
-      lg_graph_draw ( pm->phs.plg );
+      gtk_widget_queue_draw (pm->phs.plg->drawing_area);
    }
 
    g_clear_pointer(&pmsg, g_free);
@@ -2042,7 +2036,8 @@ static gint gapc_monitor_update(PGAPC_MONITOR pm)
    GtkWidget *win = NULL, *w = NULL;
    gchar *pch = NULL, *pch1 = NULL, *pch2 = NULL, *pch3 = NULL, *pch4 = NULL;
    gchar *pch_watt = NULL, *pch5 = NULL, *pch6 = NULL;
-   gdouble dValue = 0.00, dScale = 0.0, dtmp = 0.0, dCharge = 0.0, d_loadpct = 0.0, d_watt = 0.0;
+   gdouble dValue = 0.0, dScale = 0.0, dtmp = 0.0, d_loadpct = 0.0, d_watt = 0.0;
+   gdouble dMax = 0.0;
    gchar ch_buffer[GAPC_MAX_TEXT];
    PGAPC_BAR_H pbar = NULL;
 
@@ -2078,15 +2073,16 @@ static gint gapc_monitor_update(PGAPC_MONITOR pm)
       pch = "n/a";
    }
    dValue = g_strtod(pch, NULL);
-   dScale = (( dValue - 200 ) > 1) ? 230.0 : 120.0;
+   dScale = (dValue > 201) ? 230.0 : 120.0;
    dValue /= dScale;
    gapc_util_point_filter_set(&(pm->phs.sq[0]), dValue);
-   pbar = g_hash_table_lookup(pm->pht_Status, "HBar1");
-   pbar->d_value = dValue;
+   pbar = g_hash_table_lookup(pm->pht_Status, "level-bar-linev");
+   pbar->d_value = (dValue > 1.0) ? 1.0 : dValue;
    g_snprintf(pbar->c_text, sizeof(pbar->c_text), "%s from Utility", pch);
-   w = g_hash_table_lookup(pm->pht_Widgets, "HBar1-Widget");
-   if (gtk_widget_is_drawable(w))
-      gdk_window_invalidate_rect(gtk_widget_get_window(w), &pbar->rect, FALSE);
+   w = g_hash_table_lookup(pm->pht_Widgets, "level-bar-linev-Widget");
+   gtk_level_bar_set_value(GTK_LEVEL_BAR(w), pbar->d_value);
+   w = g_hash_table_lookup(pm->pht_Widgets, "label-linev-Widget");
+   gtk_label_set_text(GTK_LABEL(w), pbar->c_text);
 
    pch = g_hash_table_lookup(pm->pht_Status, "BATTV");
    if (pch == NULL) {
@@ -2102,27 +2098,28 @@ static gint gapc_monitor_update(PGAPC_MONITOR pm)
       dScale = ((gint) (dValue - 20)) ? 24 : 12;
    dValue /= dScale;
    gapc_util_point_filter_set(&(pm->phs.sq[4]), dValue);
-   pbar = g_hash_table_lookup(pm->pht_Status, "HBar2");
+   pbar = g_hash_table_lookup(pm->pht_Status, "level-bar-battv");
    pbar->d_value = (dValue > 1.0) ? 1.0 : dValue;
    g_snprintf(pbar->c_text, sizeof(pbar->c_text), "%s DC on Battery", pch);
-
-   w = g_hash_table_lookup(pm->pht_Widgets, "HBar2-Widget");
-   if (gtk_widget_is_drawable(w))
-      gdk_window_invalidate_rect(gtk_widget_get_window(w), &pbar->rect, FALSE);
+   w = g_hash_table_lookup(pm->pht_Widgets, "level-bar-battv-Widget");
+   gtk_level_bar_set_value(GTK_LEVEL_BAR(w), pbar->d_value);
+   w = g_hash_table_lookup(pm->pht_Widgets, "label-battv-Widget");
+   gtk_label_set_text(GTK_LABEL(w), pbar->c_text);
 
    pch = g_hash_table_lookup(pm->pht_Status, "BCHARGE");
    if (pch == NULL) {
       pch = "n/a";
    }
-   dCharge = dValue = g_strtod(pch, NULL);
+   dValue = g_strtod(pch, NULL);
    dValue /= 100.0;
    gapc_util_point_filter_set(&(pm->phs.sq[3]), dValue);
-   pbar = g_hash_table_lookup(pm->pht_Status, "HBar3");
+   pbar = g_hash_table_lookup(pm->pht_Status, "level-bar-bcharge");
    pbar->d_value = dValue;
    g_snprintf(pbar->c_text, sizeof(pbar->c_text), "%s Battery Charge", pch);
-   w = g_hash_table_lookup(pm->pht_Widgets, "HBar3-Widget");
-   if (gtk_widget_is_drawable(w))
-      gdk_window_invalidate_rect(gtk_widget_get_window(w), &pbar->rect, FALSE);
+   w = g_hash_table_lookup(pm->pht_Widgets, "level-bar-bcharge-Widget");
+   gtk_level_bar_set_value(GTK_LEVEL_BAR(w), pbar->d_value);
+   w = g_hash_table_lookup(pm->pht_Widgets, "label-bcharge-Widget");
+   gtk_label_set_text(GTK_LABEL(w), pbar->c_text);
 
    pch = g_hash_table_lookup(pm->pht_Status, "LOADPCT");
    if (pch == NULL) {
@@ -2131,13 +2128,13 @@ static gint gapc_monitor_update(PGAPC_MONITOR pm)
    dValue = g_strtod(pch, NULL);
    d_loadpct = dtmp = dValue /= 100.0;
    gapc_util_point_filter_set(&(pm->phs.sq[1]), dValue);
-   pbar = g_hash_table_lookup(pm->pht_Status, "HBar4");
+   pbar = g_hash_table_lookup(pm->pht_Status, "level-bar-loadpct");
    pbar->d_value = (dValue > 1.0) ? 1.0 : dValue;
    g_snprintf(pbar->c_text, sizeof(pbar->c_text), "%s", pch);
-
-   w = g_hash_table_lookup(pm->pht_Widgets, "HBar4-Widget");
-   if (gtk_widget_is_drawable(w))
-      gdk_window_invalidate_rect(gtk_widget_get_window(w), &pbar->rect, FALSE);
+   w = g_hash_table_lookup(pm->pht_Widgets, "level-bar-loadpct-Widget");
+   gtk_level_bar_set_value(GTK_LEVEL_BAR(w), pbar->d_value);
+   w = g_hash_table_lookup(pm->pht_Widgets, "label-loadpct-Widget");
+   gtk_label_set_text(GTK_LABEL(w), pbar->c_text);
 
    pch = g_hash_table_lookup(pm->pht_Status, "TIMELEFT");
    if (pch == NULL) {
@@ -2147,12 +2144,13 @@ static gint gapc_monitor_update(PGAPC_MONITOR pm)
    dScale = dValue / (1 - dtmp);
    dValue /= dScale;
    gapc_util_point_filter_set(&(pm->phs.sq[2]), dValue);
-   pbar = g_hash_table_lookup(pm->pht_Status, "HBar5");
+   pbar = g_hash_table_lookup(pm->pht_Status, "level-bar-timeleft");
    pbar->d_value = dValue;
    g_snprintf(pbar->c_text, sizeof(pbar->c_text), "%s Remaining", pch);
-   w = g_hash_table_lookup(pm->pht_Widgets, "HBar5-Widget");
-   if (gtk_widget_is_drawable(w))
-      gdk_window_invalidate_rect(gtk_widget_get_window(w), &pbar->rect, FALSE);
+   w = g_hash_table_lookup(pm->pht_Widgets, "level-bar-timeleft-Widget");
+   gtk_level_bar_set_value(GTK_LEVEL_BAR(w), pbar->d_value);
+   w = g_hash_table_lookup(pm->pht_Widgets, "label-timeleft-Widget");
+   gtk_label_set_text(GTK_LABEL(w), pbar->c_text);
 
    /*
     * information window update */
@@ -2684,16 +2682,16 @@ static gpointer *gapc_net_thread_qwork(PGAPC_MONITOR pm)
       }
 
       if (pm->b_run) {
-         g_mutex_lock(pm->gm_update);
+         g_mutex_lock(&pm->gm_update);
          if (!pm->b_run) {         /* may have waited a while for lock */
-            g_mutex_unlock(pm->gm_update);
+            g_mutex_unlock(&pm->gm_update);
             continue;
          }
 
          if ((rc = gapc_net_transaction_service(pm, "status", pm->pach_status))) {
             gapc_net_transaction_service(pm, "events", pm->pach_events);
          }
-         g_mutex_unlock(pm->gm_update);
+         g_mutex_unlock(&pm->gm_update);
 
          if (rc > 0) {
             pm->b_data_available = TRUE;
@@ -2724,7 +2722,7 @@ static gdouble gapc_util_point_filter_reset(PGAPC_SUMS sq)
 {
    gdouble d_the_final_answer = 0.0;
 
-   g_mutex_lock(sq->gm_graph);
+   g_mutex_lock(&sq->gm_graph);
 
    d_the_final_answer = sq->last_answer;
 
@@ -2740,7 +2738,7 @@ static gdouble gapc_util_point_filter_reset(PGAPC_SUMS sq)
    sq->point_min = 0.0;
    sq->point_max = 0.0;
 
-   g_mutex_unlock(sq->gm_graph);
+   g_mutex_unlock(&sq->gm_graph);
 
    return (d_the_final_answer);
 }
@@ -2750,7 +2748,7 @@ static gdouble gapc_util_point_filter_reset(PGAPC_SUMS sq)
 */
 static gdouble gapc_util_point_filter_set(PGAPC_SUMS sq, gdouble this_point)
 {
-   g_mutex_lock(sq->gm_graph);
+   g_mutex_lock(&sq->gm_graph);
 
    sq->this_point = this_point;
 
@@ -2769,7 +2767,7 @@ static gdouble gapc_util_point_filter_set(PGAPC_SUMS sq, gdouble this_point)
    if (sq->point_max < sq->this_point)
       sq->point_max = sq->this_point;
 
-   g_mutex_unlock(sq->gm_graph);
+   g_mutex_unlock(&sq->gm_graph);
 
    return (sq->this_answer);
 }
@@ -2958,117 +2956,56 @@ static gint gapc_util_update_hashtable(PGAPC_MONITOR pm, gchar * pch_unparsed)
 }
 
 /*
- *  Implements a Horizontal Bar Chart...
- *  - data value has a range of 0.0 to 1.0 for 0-100% display
- *  - in chart text is limited to about 30 chars
+ * creates level bar and allocates control data
+ * return level bar widget
  */
-static gboolean cb_util_barchart_handle_exposed(GtkWidget * widget,
-   GdkEventExpose * event, gpointer data)
+static GtkWidget *gapc_util_level_bar_create(
+   PGAPC_MONITOR  pm,
+   GtkWidget     *vbox,
+   gchar         *pch_bar_name,
+   gdouble        d_value,
+   gchar         *pch_text)
 {
-   GtkAllocation  allocation;
-   PGAPC_BAR_H    pbar = data;
-   gint           i_percent = 0;
-   PangoLayout   *playout = NULL;
-
-   g_return_val_if_fail(data, FALSE);   /* error exit */
-
-   gtk_widget_get_allocation(widget, &allocation);
-   pbar->rect.x = 0;
-   pbar->rect.y = 0;
-   pbar->rect.width = allocation.width;
-   pbar->rect.height = allocation.height;
-
-   /* scale up the less than zero data value */
-   i_percent =
-      (gint) ((gdouble) (allocation.width / 100.0) *
-      (gdouble) (pbar->d_value * 100.0));
-
-   /* the frame of the chart */
-   gtk_paint_box(
-      gtk_widget_get_style(widget),
-      gtk_widget_get_window(widget),
-      gtk_widget_get_state(widget),
-      GTK_SHADOW_ETCHED_IN,
-      &pbar->rect,
-      widget,
-      "gapc_hbar_frame",
-      0, 0,
-      allocation.width - 1, allocation.height - 1);
-
-   /* the scaled value */
-   gtk_paint_box(
-      gtk_widget_get_style(widget),
-      gtk_widget_get_window(widget),
-      GTK_STATE_ACTIVE,
-      GTK_SHADOW_OUT,
-      &pbar->rect,
-      widget,
-      "gapc_hbar_value",
-      1, 1,
-      i_percent, allocation.height - 4);
-
-   if (pbar->c_text[0]) {
-      gint x = 0, y = 0;
-
-      playout = gtk_widget_create_pango_layout(widget, pbar->c_text);
-      pango_layout_set_markup(playout, pbar->c_text, -1);
-
-      pango_layout_get_pixel_size(playout, &x, &y);
-      x = (allocation.width - x) / 2;
-      y = (allocation.height - y) / 2;
-
-      gtk_paint_layout(
-         gtk_widget_get_style(widget),
-         gtk_widget_get_window(widget),
-         GTK_STATE_NORMAL,
-         TRUE,
-         &pbar->rect,
-         widget,
-         "gapc_hbar_text",
-         (pbar->b_center_text) ? x : 6, y,
-         playout);
-
-      g_clear_object(&playout);
-   }
-
-   return TRUE;
-}
-
-/*
- * creates horizontal bar chart and allocates control data
- * requires cb_h_bar_chart_exposed() routine
- * return drawing area widget
- */
-static GtkWidget *gapc_util_barchart_create(PGAPC_MONITOR pm, GtkWidget * vbox,
-   gchar * pch_hbar_name, gdouble d_percent, gchar * pch_text)
-{
-   GdkColor     color;
+   GdkRGBA      color;
+   GtkWidget   *label = NULL;
+   GtkWidget   *level_bar = NULL;
+   GtkWidget   *overlay = NULL;
    PGAPC_BAR_H  pbar = NULL;
-   GtkWidget   *drawing_area = NULL;
    gchar       *pch = NULL;
 
    g_return_val_if_fail(pm != NULL, NULL);
 
    pbar = g_new0(GAPC_BAR_H, 1);
-   pbar->d_value = d_percent;
+   pbar->d_value = d_value;
    pbar->b_center_text = FALSE;
    g_strlcpy(pbar->c_text, pch_text, sizeof(pbar->c_text));
 
-   drawing_area = gtk_drawing_area_new();       /* manual bargraph */
-   gtk_widget_set_name(drawing_area, pch_hbar_name);
-   gdk_color_parse("#aeaeae", &color); // XXX TODO revisit on GTK 3
-   gtk_widget_modify_bg(drawing_area, GTK_STATE_ACTIVE, &color);
-   gtk_widget_set_size_request(drawing_area, 100, 20);
-   g_signal_connect(G_OBJECT(drawing_area), "expose_event",
-      G_CALLBACK(cb_util_barchart_handle_exposed), (gpointer) pbar);
+   level_bar = gtk_level_bar_new();
+   gtk_level_bar_set_value(GTK_LEVEL_BAR(level_bar), d_value);
+   pch = g_strdup_printf("level-bar-%s", pch_bar_name);
+   gtk_widget_set_name(level_bar, pch);
+   gtk_widget_set_size_request(level_bar, 100, 20);
+   gtk_widget_show(level_bar);
 
-   gtk_box_pack_start(GTK_BOX(vbox), drawing_area, TRUE, TRUE, 0);
-   gtk_widget_show(drawing_area);
-   g_hash_table_insert(pm->pht_Status, g_strdup(pch_hbar_name), pbar);
-   pch = g_strdup_printf("%s-Widget", pch_hbar_name);
-   g_hash_table_insert(pm->pht_Widgets, pch, drawing_area);
+   g_hash_table_insert(pm->pht_Status, pch, pbar);
+   pch = g_strdup_printf("%s-Widget", pch);
+   g_hash_table_insert(pm->pht_Widgets, pch, level_bar);
 
-   return drawing_area;
+   label = gtk_label_new(pch_text);
+   pch = g_strdup_printf("label-%s", pch_bar_name);
+   gtk_widget_set_name(label, pch);
+   g_clear_pointer(&pch, g_free);
+   gtk_widget_show(label);
+   pch = g_strdup_printf("label-%s-Widget", pch_bar_name);
+   g_hash_table_insert(pm->pht_Widgets, pch, label);
+
+   overlay = gtk_overlay_new();
+   gtk_container_add(GTK_CONTAINER(overlay), level_bar);
+   gtk_overlay_add_overlay(GTK_OVERLAY(overlay), label);
+   gtk_box_pack_start(GTK_BOX(vbox), overlay, TRUE, TRUE, 0);
+   gtk_widget_show(overlay);
+
+   return level_bar;
 }
 
 /*
@@ -3313,20 +3250,18 @@ static gboolean cb_panel_systray_icon_handle_clicked(GtkWidget * widget,
       case 2:
       case 3:
          if (menu != NULL) {
-            gtk_menu_popup(GTK_MENU(menu), NULL, NULL, NULL, NULL, event->button,
-               event->time);
+            gtk_menu_popup_at_pointer(GTK_MENU(menu), NULL);
          }
          break;
       default:
          return FALSE;
       }
-
       return TRUE;
    }
 
    return FALSE;
 }
-
+/* XXX
 static void cb_panel_systray_icon_destroy(GtkObject * object, gpointer gp)
 {
    PGAPC_CONFIG pcfg = NULL;
@@ -3335,7 +3270,7 @@ static void cb_panel_systray_icon_destroy(GtkObject * object, gpointer gp)
    g_return_if_fail(gp != NULL);
 
    if (((PGAPC_MONITOR) gp)->cb_id == CB_MONITOR_ID) {
-      /* this is a monitor struct (2) */
+      // this is a monitor struct (2)
       pm = (PGAPC_MONITOR) gp;
       pm->tray_icon = NULL;
       pm->tray_image = NULL;
@@ -3347,7 +3282,7 @@ static void cb_panel_systray_icon_destroy(GtkObject * object, gpointer gp)
       }
 
    } else {
-      /* this is a config struct (1) */
+      // this is a config struct (1)
       pcfg = (PGAPC_CONFIG) gp;
       pcfg->tray_icon = NULL;
       pcfg->tray_image = NULL;
@@ -3361,7 +3296,7 @@ static void cb_panel_systray_icon_destroy(GtkObject * object, gpointer gp)
 
    return;
 }
-
+*/
 static gboolean gapc_panel_systray_icon_create(gpointer gp)
 {
    PGAPC_CONFIG pcfg = NULL;
@@ -3407,8 +3342,8 @@ static gboolean gapc_panel_systray_icon_create(gpointer gp)
 
    g_signal_connect(*tray_icon, "embedded",
       G_CALLBACK(cb_panel_systray_icon_activated), gp);
-   g_signal_connect(*tray_icon, "destroy",
-      G_CALLBACK(cb_panel_systray_icon_destroy), gp);
+   // XXX g_signal_connect(*tray_icon, "destroy",
+   // XXX    G_CALLBACK(cb_panel_systray_icon_destroy), gp);
    g_signal_connect(*tray_icon, "configure-event",
       G_CALLBACK(cb_panel_systray_icon_configure), gp);
    g_signal_connect(*tray_icon, "button-press-event",
@@ -3833,7 +3768,6 @@ static GtkWidget *gapc_panel_preferences_model_init(PGAPC_CONFIG pcfg)
    /* create the display columns and treeview */
    treeview = gtk_tree_view_new_with_model(GTK_TREE_MODEL(model));
    gtk_tree_view_columns_autosize(GTK_TREE_VIEW(treeview));
-   gtk_tree_view_set_rules_hint(GTK_TREE_VIEW(treeview), TRUE);
    gtk_tree_view_set_enable_search(GTK_TREE_VIEW(treeview), FALSE);
 
    /* allocate control struct for viewable columns */
@@ -3927,10 +3861,10 @@ static GtkWidget *gapc_panel_preferences_model_init(PGAPC_CONFIG pcfg)
 
    column = gtk_tree_view_column_new_with_attributes("Monitor", anyrndr,
       "text", GAPC_PREFS_MONITOR, NULL);
-   gtk_tree_view_column_set_sort_column_id(column, GAPC_PREFS_MONITOR);
    gtk_tree_view_column_clicked(column);
    g_object_set(G_OBJECT(column), "visible", FALSE, NULL);
    gtk_tree_view_append_column(GTK_TREE_VIEW(treeview), column);
+   gtk_tree_view_column_set_sort_column_id(column, GAPC_PREFS_MONITOR);
 
    return treeview;
 }
@@ -3967,7 +3901,6 @@ static GtkWidget *gapc_panel_monitors_model_init(PGAPC_CONFIG pcfg)
 
    /* create the display columns and treeview */
    treeview = gtk_tree_view_new_with_model(GTK_TREE_MODEL(model));
-   gtk_tree_view_set_rules_hint(GTK_TREE_VIEW(treeview), TRUE);
    gtk_tree_view_columns_autosize(GTK_TREE_VIEW(treeview));
    gtk_tree_view_set_enable_search(GTK_TREE_VIEW(treeview), FALSE);
    g_signal_connect(treeview, "row-activated",
@@ -4004,10 +3937,10 @@ static GtkWidget *gapc_panel_monitors_model_init(PGAPC_CONFIG pcfg)
 
    column = gtk_tree_view_column_new_with_attributes("Monitor", renderer_any,
       "text", GAPC_MON_MONITOR, NULL);
-   gtk_tree_view_column_set_sort_column_id(column, GAPC_MON_MONITOR);
    g_object_set(G_OBJECT(column), "visible", FALSE, NULL);
    gtk_tree_view_column_clicked(column);
    gtk_tree_view_append_column(GTK_TREE_VIEW(treeview), column);
+   gtk_tree_view_column_set_sort_column_id(column, GAPC_MON_MONITOR);
 
 
    return treeview;
@@ -4239,7 +4172,7 @@ static gint gapc_panel_monitor_list_page(PGAPC_CONFIG pcfg, GtkNotebook * notebo
 static gint gapc_panel_preferences_page(PGAPC_CONFIG pcfg, GtkNotebook * notebook)
 {
    GtkWidget *label = NULL, *frame = NULL, *vbox = NULL, *sw = NULL;
-   GtkWidget *pbox = NULL, *box = NULL, *cbox = NULL;
+   GtkWidget *pbox = NULL, *box = NULL, *button = NULL, *checkbox = NULL;
    GtkWidget *treeview = NULL;
    GtkTreeSelection *select = NULL;
    GtkTreeIter iter;
@@ -4263,7 +4196,8 @@ static gint gapc_panel_preferences_page(PGAPC_CONFIG pcfg, GtkNotebook * noteboo
    box = gtk_event_box_new();
    gtk_container_add(GTK_CONTAINER(frame), box);
    gtk_widget_show(box);
-   vbox = gtk_vbox_new(FALSE, 0);
+   vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(vbox), FALSE);
    gtk_container_add(GTK_CONTAINER(box), vbox);
    gtk_widget_show(vbox);
    frame = gtk_frame_new("");
@@ -4272,7 +4206,8 @@ static gint gapc_panel_preferences_page(PGAPC_CONFIG pcfg, GtkNotebook * noteboo
    gtk_frame_set_label_align(GTK_FRAME(frame), 0.5, 0.8);
    gtk_container_add(GTK_CONTAINER(vbox), frame);
    gtk_widget_show(frame);
-   pbox = gtk_vbox_new(FALSE, 0);
+   pbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(pbox), FALSE);
    gtk_container_add(GTK_CONTAINER(frame), pbox);
    gtk_widget_show(pbox);
 
@@ -4302,27 +4237,28 @@ static gint gapc_panel_preferences_page(PGAPC_CONFIG pcfg, GtkNotebook * noteboo
    }
 
    /* add options for adding monitors */
-   box = gtk_hbox_new(FALSE, 4);
+   box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+   gtk_box_set_homogeneous(GTK_BOX(box), FALSE);
    gtk_box_pack_start(GTK_BOX(pbox), box, FALSE, FALSE, 0);
    gtk_widget_show(box);
 
-   cbox = gtk_button_new_from_stock(GTK_STOCK_ADD);
-   g_signal_connect(cbox, "clicked", G_CALLBACK(cb_panel_prefs_button_add_rec),
+   button = gtk_button_new_with_label("Add");
+   g_signal_connect(button, "clicked", G_CALLBACK(cb_panel_prefs_button_add_rec),
       pcfg);
    gtk_widget_set_tooltip_text(
-      GTK_WIDGET(cbox),
+      GTK_WIDGET(button),
       "Adds a new monitor\ndefinition to the system.");
-   gtk_box_pack_start(GTK_BOX(box), cbox, FALSE, FALSE, 2);
-   gtk_widget_show(cbox);
+   gtk_box_pack_start(GTK_BOX(box), button, FALSE, FALSE, 2);
+   gtk_widget_show(button);
 
-   cbox = gtk_button_new_from_stock(GTK_STOCK_REMOVE);
-   g_signal_connect(cbox, "clicked", G_CALLBACK(cb_panel_prefs_button_remove_rec),
+   button = gtk_button_new_with_label("Remove");
+   g_signal_connect(button, "clicked", G_CALLBACK(cb_panel_prefs_button_remove_rec),
       pcfg);
    gtk_widget_set_tooltip_text(
-      GTK_WIDGET(cbox),
+      GTK_WIDGET(button),
       "Removes selected monitor\ndefinition from the system.");
-   gtk_box_pack_start(GTK_BOX(box), cbox, FALSE, FALSE, 2);
-   gtk_widget_show(cbox);
+   gtk_box_pack_start(GTK_BOX(box), button, FALSE, FALSE, 2);
+   gtk_widget_show(button);
 
    /* add options for control panel */
    frame = gtk_frame_new("Control panel options");
@@ -4330,20 +4266,21 @@ static gint gapc_panel_preferences_page(PGAPC_CONFIG pcfg, GtkNotebook * noteboo
    gtk_box_pack_start(GTK_BOX(vbox), frame, FALSE, FALSE, 0);
    gtk_widget_show(frame);
 
-   box = gtk_hbox_new(FALSE, 4);
+   box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+   gtk_box_set_homogeneous(GTK_BOX(box), FALSE);
    gtk_container_add(GTK_CONTAINER(frame), box);
    gtk_widget_show(box);
 
-   cbox = gtk_check_button_new_with_mnemonic("Use _tray Icon");
+   checkbox = gtk_check_button_new_with_mnemonic("Use _tray Icon");
    gtk_toggle_button_set_active(
-      GTK_TOGGLE_BUTTON(cbox),
+      GTK_TOGGLE_BUTTON(checkbox),
       g_settings_get_boolean(pcfg->controller_settings, GAPC_SYSTRAY_KEY));
    gtk_widget_set_tooltip_text(
-      GTK_WIDGET(cbox),
+      GTK_WIDGET(checkbox),
       "Creates a notification area icon\nfor this control panel.");
-   gtk_box_pack_start(GTK_BOX(box), cbox, FALSE, FALSE, 2);
-   gtk_widget_show(cbox);
-   g_hash_table_insert(pcfg->pht_Widgets, g_strdup(GAPC_SYSTRAY_KEY), cbox);
+   gtk_box_pack_start(GTK_BOX(box), checkbox, FALSE, FALSE, 2);
+   gtk_widget_show(checkbox);
+   g_hash_table_insert(pcfg->pht_Widgets, g_strdup(GAPC_SYSTRAY_KEY), checkbox);
 
    return i_page;
 }
@@ -4384,16 +4321,19 @@ static gint gapc_panel_about_page(GtkNotebook * notebook, gchar * pch_pname,
    i_page = gtk_notebook_append_page(notebook, frame, label);
    gtk_widget_show(frame);
 
-   vbox = gtk_vbox_new(FALSE, 8);
+   vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+   gtk_box_set_homogeneous(GTK_BOX(vbox), FALSE);
    gtk_container_add(GTK_CONTAINER(frame), vbox);
    gtk_widget_show(vbox);
 
-   hbox = gtk_hbox_new(FALSE, 0);
+   hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(hbox), FALSE);
    gtk_box_pack_start(GTK_BOX(vbox), hbox, FALSE, TRUE, 0);
    gtk_widget_show(hbox);
 
    image = gtk_image_new();
-   gtk_misc_set_alignment((GtkMisc *) image, 1.0, 0.5);
+   gtk_widget_set_halign(image, GTK_ALIGN_END);
+   gtk_widget_set_margin_top(image, 4);
    scaled = gdk_pixbuf_scale_simple(icon, 48, 48, GDK_INTERP_BILINEAR);
    gtk_image_set_from_pixbuf(GTK_IMAGE(image), scaled);
    gtk_box_pack_start(GTK_BOX(hbox), image, TRUE, TRUE, 0);
@@ -4404,7 +4344,8 @@ static gint gapc_panel_about_page(GtkNotebook * notebook, gchar * pch_pname,
    gtk_label_set_use_markup(GTK_LABEL(label), TRUE);
    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_LEFT);
    gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
-   gtk_misc_set_alignment((GtkMisc *) label, 0.0, 0.7);
+   gtk_label_set_xalign(GTK_LABEL(label), 0.0);
+   gtk_label_set_yalign(GTK_LABEL(label), 0.7);
    gtk_box_pack_start(GTK_BOX(hbox), label, TRUE, TRUE, 0);
    gtk_widget_show(label);
 
@@ -4412,7 +4353,6 @@ static gint gapc_panel_about_page(GtkNotebook * notebook, gchar * pch_pname,
    gtk_label_set_use_markup(GTK_LABEL(label), TRUE);
    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_CENTER);
    gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
-   gtk_misc_set_alignment((GtkMisc *) label, 0.5, 0.5);
    gtk_box_pack_start(GTK_BOX(vbox), label, TRUE, TRUE, 0);
    gtk_widget_show(label);
 
@@ -4426,7 +4366,8 @@ static void cb_monitor_interface_show(GtkWidget * widget, PGAPC_MONITOR pm)
 {
    g_return_if_fail(pm != NULL);
    pm->b_visible = TRUE;
-   lg_graph_draw ( pm->phs.plg );
+   // XXX lg_graph_draw ( pm->phs.plg );
+   // XXX gtk_widget_queue_draw (pm->phs.plg->drawing_area);
 }
 
 static void cb_monitor_interface_hide(GtkWidget * widget, PGAPC_MONITOR pm)
@@ -4876,8 +4817,6 @@ static void cb_panel_preferences_gsettings_changed(
          g_clear_pointer(&ov_s_host, g_free);
       }
    }
-   gdk_flush();
-
    return;
 }
 
@@ -4932,13 +4871,13 @@ static gboolean gapc_color_property_value_get(
    GVariant *color_setting,
    gpointer user_data) {
 
-   GdkColor color;
+   GdkRGBA color;
    gsize length;
    const gchar *color_string = g_variant_get_string (color_setting, &length);
    if (length == 0) {
       return FALSE;
    }
-   if (gdk_color_parse(color_string, &color)) {
+   if (gdk_rgba_parse(&color, color_string)) {
       g_value_set_boxed(color_property_value, &color);
       return TRUE;
    }
@@ -4950,10 +4889,9 @@ static GVariant * gapc_color_setting_set(
    const GVariantType *expected_type,
    gpointer user_data)
 {
-   GdkColor *color = g_value_get_boxed (color_property_value);
-   gchar *color_string = gdk_color_to_string (color);
-
-   GVariant *variant = g_variant_new_string (color_string);
+   GdkRGBA  *color        = g_value_get_boxed (color_property_value);
+   gchar    *color_string = gdk_rgba_to_string (color);
+   GVariant *variant      = g_variant_new_string (color_string);
    g_clear_pointer(&color_string, g_free);
 
    return variant;
@@ -5004,7 +4942,7 @@ static gboolean gapc_gsettings_watch(PGAPC_CONFIG pcfg)
       pcfg->controller_settings,
       GAPC_COLOR_LINEV_KEY,
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_LINEV_KEY),
-      "color",
+      "rgba",
       G_SETTINGS_BIND_DEFAULT,
       gapc_color_property_value_get,
       gapc_color_setting_set,
@@ -5015,7 +4953,7 @@ static gboolean gapc_gsettings_watch(PGAPC_CONFIG pcfg)
       pcfg->controller_settings,
       GAPC_COLOR_LOADPCT_KEY,
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_LOADPCT_KEY),
-      "color",
+      "rgba",
       G_SETTINGS_BIND_DEFAULT,
       gapc_color_property_value_get,
       gapc_color_setting_set,
@@ -5026,7 +4964,7 @@ static gboolean gapc_gsettings_watch(PGAPC_CONFIG pcfg)
       pcfg->controller_settings,
       GAPC_COLOR_TIMELEFT_KEY,
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_TIMELEFT_KEY),
-      "color",
+      "rgba",
       G_SETTINGS_BIND_DEFAULT,
       gapc_color_property_value_get,
       gapc_color_setting_set,
@@ -5037,7 +4975,7 @@ static gboolean gapc_gsettings_watch(PGAPC_CONFIG pcfg)
       pcfg->controller_settings,
       GAPC_COLOR_BCHARGE_KEY,
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_BCHARGE_KEY),
-      "color",
+      "rgba",
       G_SETTINGS_BIND_DEFAULT,
       gapc_color_property_value_get,
       gapc_color_setting_set,
@@ -5048,7 +4986,7 @@ static gboolean gapc_gsettings_watch(PGAPC_CONFIG pcfg)
       pcfg->controller_settings,
       GAPC_COLOR_BATTV_KEY,
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_BATTV_KEY),
-      "color",
+      "rgba",
       G_SETTINGS_BIND_DEFAULT,
       gapc_color_property_value_get,
       gapc_color_setting_set,
@@ -5059,7 +4997,7 @@ static gboolean gapc_gsettings_watch(PGAPC_CONFIG pcfg)
       pcfg->controller_settings,
       GAPC_COLOR_WINDOW_KEY,
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_WINDOW_KEY),
-      "color",
+      "rgba",
       G_SETTINGS_BIND_DEFAULT,
       gapc_color_property_value_get,
       gapc_color_setting_set,
@@ -5070,7 +5008,7 @@ static gboolean gapc_gsettings_watch(PGAPC_CONFIG pcfg)
       pcfg->controller_settings,
       GAPC_COLOR_CHART_KEY,
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_CHART_KEY),
-      "color",
+      "rgba",
       G_SETTINGS_BIND_DEFAULT,
       gapc_color_property_value_get,
       gapc_color_setting_set,
@@ -5081,7 +5019,7 @@ static gboolean gapc_gsettings_watch(PGAPC_CONFIG pcfg)
       pcfg->controller_settings,
       GAPC_COLOR_TITLE_KEY,
       g_hash_table_lookup(pcfg->pht_Widgets, GAPC_COLOR_TITLE_KEY),
-      "color",
+      "rgba",
       G_SETTINGS_BIND_DEFAULT,
       gapc_color_property_value_get,
       gapc_color_setting_set,
@@ -5141,11 +5079,6 @@ static void cb_monitor_interface_destroy(GtkWidget * widget, PGAPC_MONITOR pm)
          pm->tid_auto_refresh = 0;
       }
    }
-   if (pm->phs.plg->tid_configure != 0) {
-      if (g_source_remove(pm->phs.plg->tid_configure)) {
-         pm->phs.plg->tid_configure = 0;
-      }
-   }
    if (pm->tid_one_time_refresh != 0) {
       if (g_source_remove(pm->tid_one_time_refresh)) {
          pm->tid_one_time_refresh = 0;
@@ -5167,13 +5100,11 @@ static void cb_monitor_interface_destroy(GtkWidget * widget, PGAPC_MONITOR pm)
       g_thread_join(pm->tid_thread_qwork);
    }
 
-   g_mutex_free(pm->gm_update);
+   g_mutex_clear(&pm->gm_update);
    g_async_queue_unref(pm->q_network);
 
    for (h_index = 0; h_index < GAPC_LINEGRAPH_MAX_SERIES; h_index++) {
-      if (pm->phs.sq[h_index].gm_graph != NULL) {
-         g_mutex_free(pm->phs.sq[h_index].gm_graph);
-      }
+      g_mutex_clear(&pm->phs.sq[h_index].gm_graph);
    }
 
    if (pm->pht_Widgets != NULL) {
@@ -5214,7 +5145,6 @@ static void cb_monitor_interface_destroy(GtkWidget * widget, PGAPC_MONITOR pm)
    g_clear_pointer(&pm->phs.plg->x_label_text, g_free);
    g_clear_pointer(&pm->phs.plg->y_label_text, g_free);
    g_clear_pointer(&pm->phs.plg->x_title_text, g_free);
-   g_clear_pointer(&pm->phs.plg->graph_cr, cairo_destroy);
    g_clear_pointer(&pm->phs.plg, g_free);
    g_clear_pointer(&pm, g_free);
    return;
@@ -5348,24 +5278,26 @@ static GtkWidget *gapc_main_interface_create(PGAPC_CONFIG pcfg)
 
    gapc_panel_systray_icon_create(pcfg);
 
-   lbox = gtk_vbox_new(FALSE, 2);
+   lbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
+   gtk_box_set_homogeneous(GTK_BOX(lbox), FALSE);
    gtk_container_add(GTK_CONTAINER(window), lbox);
    gtk_widget_show(lbox);
 
 /* */
 
    /* Notebook Box  */
-   bbox = gtk_vbox_new(FALSE, 0);
+   bbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(bbox), FALSE);
    gtk_container_set_border_width(GTK_CONTAINER(bbox), 6);
    gtk_box_pack_start(GTK_BOX(lbox), bbox, TRUE, TRUE, 2);
    gtk_widget_show(bbox);
-   nbox = gtk_hbox_new(TRUE, 0);
+   nbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(nbox), TRUE);
    gtk_box_pack_start(GTK_BOX(bbox), nbox, TRUE, TRUE, 0);
    gtk_widget_show(nbox);
 
    /* create the status bar */
    sbar = gtk_statusbar_new();
-   gtk_statusbar_set_has_resize_grip(GTK_STATUSBAR(sbar), FALSE);
    g_hash_table_insert(pcfg->pht_Widgets, g_strdup("StatusBar"), sbar);
    gtk_box_pack_end(GTK_BOX(lbox), sbar, FALSE, TRUE, 0);
    gtk_widget_show(sbar);
@@ -5373,11 +5305,12 @@ static GtkWidget *gapc_main_interface_create(PGAPC_CONFIG pcfg)
       gtk_statusbar_get_context_id(GTK_STATUSBAR(sbar), "Informational");
 
    /* buttons Box  */
-   bbox = gtk_hbox_new(FALSE, 0);
+   bbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(bbox), FALSE);
    gtk_container_set_border_width(GTK_CONTAINER(bbox), 0);
    gtk_box_pack_end(GTK_BOX(lbox), bbox, FALSE, FALSE, 0);
    gtk_widget_show(bbox);
-   box = gtk_hbutton_box_new();
+   box = gtk_button_box_new(GTK_ORIENTATION_HORIZONTAL);
    gtk_button_box_set_layout (GTK_BUTTON_BOX (box), GTK_BUTTONBOX_SPREAD);
    gtk_container_set_border_width(GTK_CONTAINER(box), 6);
    gtk_box_pack_end(GTK_BOX(bbox), box, FALSE, FALSE, 2);
@@ -5406,7 +5339,7 @@ static GtkWidget *gapc_main_interface_create(PGAPC_CONFIG pcfg)
 
    /* quit Control button */
 /*
-   button = gtk_button_new_from_stock(GTK_STOCK_CLOSE);
+   button = gtk_button_new_with_label("Close");
    g_signal_connect_swapped(button, "clicked", G_CALLBACK(gtk_widget_hide), GTK_WIDGET(window));
    gtk_box_pack_end(GTK_BOX(box), button, TRUE, TRUE, 0);
    gtk_widget_show(button);
@@ -5415,7 +5348,7 @@ static GtkWidget *gapc_main_interface_create(PGAPC_CONFIG pcfg)
    gtk_widget_grab_default(button);
 */
 
-   button = gtk_button_new_from_stock(GTK_STOCK_QUIT);
+   button = gtk_button_new_with_label("Quit");
    g_signal_connect(button, "clicked", G_CALLBACK(cb_main_interface_button_quit),
       pcfg);
    gtk_box_pack_end(GTK_BOX(box), button, TRUE, TRUE, 0);
@@ -5425,7 +5358,7 @@ static GtkWidget *gapc_main_interface_create(PGAPC_CONFIG pcfg)
    gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), i_page);
 
    pcfg->menu = menu = gtk_menu_new();
-   menu_item = gtk_image_menu_item_new_from_stock(GTK_STOCK_JUMP_TO, NULL);
+   menu_item = gtk_menu_item_new_with_label("Jump to");
    g_signal_connect(G_OBJECT(menu_item), "activate",
       G_CALLBACK(cb_util_popup_menu_response_jumpto), pcfg);
    gtk_menu_shell_append(GTK_MENU_SHELL(menu), menu_item);
@@ -5433,7 +5366,7 @@ static GtkWidget *gapc_main_interface_create(PGAPC_CONFIG pcfg)
    menu_item = gtk_separator_menu_item_new();
    gtk_menu_shell_append(GTK_MENU_SHELL(menu), menu_item);
    gtk_widget_show(menu_item);
-   menu_item = gtk_image_menu_item_new_from_stock(GTK_STOCK_QUIT, NULL);
+   menu_item = gtk_menu_item_new_with_label("Quit");
    g_signal_connect(G_OBJECT(menu_item), "activate",
       G_CALLBACK(cb_util_popup_menu_response_exit), pcfg);
    gtk_menu_shell_append(GTK_MENU_SHELL(menu), menu_item);
@@ -5503,10 +5436,8 @@ static gint gapc_monitor_history_page(PGAPC_MONITOR pm, GtkWidget * notebook)
    lg_graph_debug = FALSE;
 
    for (h_index = 0; h_index < GAPC_LINEGRAPH_MAX_SERIES; h_index++) {
-      if (pm->phs.sq[h_index].gm_graph != NULL) {
-         g_mutex_free(pm->phs.sq[h_index].gm_graph);
-      }
-      pm->phs.sq[h_index].gm_graph = g_mutex_new();
+      g_mutex_clear(&pm->phs.sq[h_index].gm_graph);
+      g_mutex_init(&pm->phs.sq[h_index].gm_graph);
    }
 
    /* get values from GSettings */
@@ -5519,7 +5450,8 @@ static gint gapc_monitor_history_page(PGAPC_MONITOR pm, GtkWidget * notebook)
 
    /*
     * Create notebook page page */
-   box = gtk_vbox_new(FALSE, 0);
+   box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(box), FALSE);
    g_object_set_data ( G_OBJECT(box), "pcfg-pointer", pm->gp);
    label = gtk_label_new("Historical Summary");
    i_page = gtk_notebook_append_page(GTK_NOTEBOOK(notebook), box, label);
@@ -5582,23 +5514,19 @@ static gboolean cb_util_line_chart_refresh(PGAPC_HISTORY pg)
       return G_SOURCE_REMOVE;
    }
 
-
-   gdk_threads_enter();
-
    for (h_index = 0; h_index < plg->i_num_series; h_index++) {
         lg_graph_data_series_add_value (plg, h_index,
                                 gapc_util_point_filter_reset(&(pg->sq[h_index])) );
    }
 
    if (plg->i_points_available >= plg->x_range.i_max_scale ) {
-       lg_graph_draw ( plg );
+       // XXX lg_graph_draw ( plg );
+       gtk_widget_queue_draw (plg->drawing_area);
    } else {
-       lg_graph_data_series_draw_all (plg, TRUE);
-       lg_graph_redraw ( plg );
+       // XXX FIXME lg_graph_data_series_draw_all (plg, TRUE);
+       // XXX FIXME lg_graph_redraw ( plg );
+       gtk_widget_queue_draw (plg->drawing_area);
    }
-
-   gdk_flush();
-   gdk_threads_leave();
 
    if (pg->b_startup) {
      pg->b_startup = FALSE;
@@ -5615,74 +5543,83 @@ static gboolean cb_util_line_chart_refresh(PGAPC_HISTORY pg)
 */
 static PLGRAPH lg_graph_create (GtkWidget * box, gint width, gint height)
 {
-    PLGRAPH     plg = NULL;
-    PGAPC_CONFIG pcfg = NULL;
-    GtkWidget  *drawing_area = NULL;
-    PangoFontDescription *font_desc = NULL;
-    gchar *pstring = NULL;
+   PLGRAPH         plg = NULL;
+   PGAPC_CONFIG    pcfg = NULL;
+   GtkWidget      *drawing_area = NULL;
+   GtkCssProvider *css_provider = NULL;
+   gchar          *pstring = NULL;
 
-    pcfg = (PGAPC_CONFIG)g_object_get_data (G_OBJECT(box), "pcfg-pointer");
-    g_return_val_if_fail (pcfg != NULL, NULL);
+   pcfg = (PGAPC_CONFIG)g_object_get_data (G_OBJECT(box), "pcfg-pointer");
+   g_return_val_if_fail (pcfg != NULL, NULL);
 
-    plg = g_new0 (LGRAPH, 1);
-    g_return_val_if_fail (plg != NULL, NULL);
+   plg = g_new0 (LGRAPH, 1);
+   g_return_val_if_fail (plg != NULL, NULL);
 
-    plg->cb_id = CB_GRAPH_ID;
-    plg->x_range.cb_id = CB_RANGE_ID;
-    plg->y_range.cb_id = CB_RANGE_ID;
-    plg->b_tooltip_active = TRUE;
-    /*
-     * These must be set before the first drawing_area configure event
-     */
-    lg_graph_set_chart_title  (plg, "<span size=\"medium\">Waiting for Update</span>");
-    lg_graph_set_y_label_text (plg, "<span size=\"small\">Percentage of 100% normal</span>");
-    lg_graph_set_x_label_text (plg, "<span size=\"small\">Waiting for Update</span>");
+   plg->cb_id = CB_GRAPH_ID;
+   plg->x_range.cb_id = CB_RANGE_ID;
+   plg->y_range.cb_id = CB_RANGE_ID;
+   plg->b_tooltip_active = TRUE;
+   /*
+    * These must be set before the first drawing_area configure event
+    */
+   lg_graph_set_chart_title  (plg, "<span size=\"medium\">Waiting for Update</span>");
+   lg_graph_set_y_label_text (plg, "<span size=\"small\">Percentage of 100% normal</span>");
+   lg_graph_set_x_label_text (plg, "<span size=\"small\">Waiting for Update</span>");
 
-    g_snprintf (plg->ch_tooltip_text, sizeof (plg->ch_tooltip_text), "%s",
-                "Waiting for Graphable Data...");
+   g_snprintf (plg->ch_tooltip_text, sizeof (plg->ch_tooltip_text), "%s",
+               "Waiting for Graphable Data...");
 
-    pstring = g_settings_get_string(pcfg->controller_settings, GAPC_COLOR_TITLE_KEY);
-    lg_graph_set_chart_title_color (plg, pstring);
-    g_clear_pointer (&pstring, g_free);
+   pstring = g_settings_get_string(pcfg->controller_settings, GAPC_COLOR_TITLE_KEY);
+   lg_graph_set_chart_title_color (plg, pstring);
+   g_clear_pointer (&pstring, g_free);
 
-    lg_graph_set_chart_scales_color (plg, "black");
+   lg_graph_set_chart_scales_color (plg, "black");
 
-    pstring = g_settings_get_string(pcfg->controller_settings, GAPC_COLOR_CHART_KEY);
-    lg_graph_set_chart_window_fg_color (plg, pstring);
-    g_clear_pointer (&pstring, g_free);
+   pstring = g_settings_get_string(pcfg->controller_settings, GAPC_COLOR_CHART_KEY);
+   lg_graph_set_chart_window_fg_color (plg, pstring);
+   g_clear_pointer (&pstring, g_free);
 
-    pstring = g_settings_get_string(pcfg->controller_settings, GAPC_COLOR_WINDOW_KEY);
-    lg_graph_set_chart_window_bg_color (plg, pstring);
-    g_clear_pointer (&pstring, g_free);
+   pstring = g_settings_get_string(pcfg->controller_settings, GAPC_COLOR_WINDOW_KEY);
+   lg_graph_set_chart_window_bg_color (plg, pstring);
+   g_clear_pointer (&pstring, g_free);
 
-    /* Xminor divisions, Xmajor divisions, Xbotton scale, Xtop scale, ...y */
-    lg_graph_set_ranges (plg, 1, 2, 0, 40, 2, 10, 0, 110);
+   /* Xminor divisions, Xmajor divisions, Xbotton scale, Xtop scale, ...y */
+   lg_graph_set_ranges (plg, 1, 2, 0, 40, 2, 10, 0, 110);
 
-    drawing_area = plg->drawing_area = gtk_drawing_area_new ();
-    gtk_widget_set_events (drawing_area,
-                           GDK_EXPOSURE_MASK | GDK_BUTTON_PRESS_MASK |
-                           GDK_POINTER_MOTION_MASK | GDK_POINTER_MOTION_HINT_MASK);
-    gtk_widget_set_size_request (GTK_WIDGET (drawing_area), width, height); // XXX TODO revisit on GTK 3
-    gtk_box_pack_start (GTK_BOX (box), drawing_area, TRUE, TRUE, 0);
+   drawing_area = plg->drawing_area = gtk_drawing_area_new ();
+   gtk_widget_set_events (drawing_area,
+                          GDK_EXPOSURE_MASK | GDK_BUTTON_PRESS_MASK |
+                          GDK_POINTER_MOTION_MASK | GDK_POINTER_MOTION_HINT_MASK);
+   gtk_widget_set_size_request (GTK_WIDGET (drawing_area), width, height);
+   gtk_box_pack_start (GTK_BOX (box), drawing_area, TRUE, TRUE, 0);
 
-    font_desc = pango_font_description_from_string ("Mono 10");
-    gtk_widget_modify_font (drawing_area, font_desc);
-    pango_font_description_free (font_desc);
+   css_provider = gtk_css_provider_new();
+   gtk_css_provider_load_from_data(
+      css_provider,
+      "drawingarea {font: 10pt 'Mono';}",
+      -1, NULL);
 
-    gtk_widget_realize (drawing_area);
-    gtk_widget_show (drawing_area);
+   gtk_style_context_add_provider(
+      gtk_widget_get_style_context(drawing_area),
+      GTK_STYLE_PROVIDER(css_provider),
+      GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
 
-    /* --- Signals used to handle backing pixmap --- */
-    g_signal_connect (drawing_area, "configure_event",
-                      G_CALLBACK(lg_graph_configure_event_cb), plg);
-    g_signal_connect (drawing_area, "expose_event",
-                      G_CALLBACK(lg_graph_expose_event_cb), plg);
-    g_signal_connect (drawing_area, "motion_notify_event",
-                      G_CALLBACK(lg_graph_motion_notify_event_cb), plg);
-    g_signal_connect (drawing_area, "button_press_event",
-                      G_CALLBACK(lg_graph_button_press_event_cb), plg);
+   g_clear_object(&css_provider);
 
-    return plg;
+   gtk_widget_realize (drawing_area);
+   gtk_widget_show (drawing_area);
+
+   /* --- Signals used to handle backing surface --- */
+   g_signal_connect (drawing_area, "configure_event",
+                     G_CALLBACK(lg_graph_configure_event_cb), plg);
+   g_signal_connect (drawing_area, "draw",
+                     G_CALLBACK(lg_graph_draw_cb), plg);
+   g_signal_connect (drawing_area, "motion_notify_event",
+                     G_CALLBACK(lg_graph_motion_notify_event_cb), plg);
+   g_signal_connect (drawing_area, "button_press_event",
+                     G_CALLBACK(lg_graph_button_press_event_cb), plg);
+
+   return plg;
 }
 
 
@@ -5693,6 +5630,7 @@ static gint gapc_monitor_information_page(PGAPC_MONITOR pm, GtkWidget * notebook
 {
    GtkWidget *frame, *label, *pbox, *lbox, *rbox, *gbox;
    GtkWidget *tbox, *tlbox, *trbox;
+   GtkWidget *level_bar;
    gint i_page = 0;
 
    /* Create a Notebook Page */
@@ -5703,16 +5641,19 @@ static gint gapc_monitor_information_page(PGAPC_MONITOR pm, GtkWidget * notebook
    i_page = gtk_notebook_append_page(GTK_NOTEBOOK(notebook), gbox, label);
    gtk_widget_show(gbox);
 
-   tbox = gtk_hbox_new(FALSE, 4);
+   tbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+   gtk_box_set_homogeneous(GTK_BOX(tbox), FALSE);
    gtk_container_add(GTK_CONTAINER(gbox), tbox);
    gtk_widget_show(tbox);
 
    /*
     * create basic frame */
-   tlbox = gtk_vbox_new(TRUE, 2);
+   tlbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
+   gtk_box_set_homogeneous(GTK_BOX(tlbox), TRUE);
    gtk_box_pack_start(GTK_BOX(tbox), tlbox, TRUE, TRUE, 0);
    gtk_widget_show(tlbox);
-   trbox = gtk_vbox_new(TRUE, 2);
+   trbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
+   gtk_box_set_homogeneous(GTK_BOX(trbox), TRUE);
    gtk_box_pack_end(GTK_BOX(tbox), trbox, TRUE, TRUE, 0);
    gtk_widget_show(trbox);
 
@@ -5724,23 +5665,27 @@ static gint gapc_monitor_information_page(PGAPC_MONITOR pm, GtkWidget * notebook
    gtk_box_pack_start(GTK_BOX(tlbox), frame, TRUE, TRUE, 0);
    gtk_widget_show(frame);
 
-   pbox = gtk_hbox_new(FALSE, 4);
+   pbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+   gtk_box_set_homogeneous(GTK_BOX(pbox), FALSE);
    gtk_container_add(GTK_CONTAINER(frame), pbox);
    gtk_widget_show(pbox);
-   lbox = gtk_vbox_new(FALSE, 0);
+   lbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(lbox), FALSE);
    gtk_box_pack_start(GTK_BOX(pbox), lbox, FALSE, TRUE, 0);
    gtk_widget_show(lbox);
-   rbox = gtk_vbox_new(FALSE, 0);
+   rbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(rbox), FALSE);
    gtk_box_pack_end(GTK_BOX(pbox), rbox, TRUE, TRUE, 0);
    gtk_widget_show(rbox);
 
    label = gtk_label_new("Selftest running\n" "Number of transfers\n"
       "Reason last transfer\n" "Last transfer to battery\n"
-      "Last transfer off battery\n" "Time on battery\n" "Cummulative on battery");
+      "Last transfer off battery\n" "Time on battery\n" "Cumulative on battery");
    gtk_label_set_use_markup(GTK_LABEL(label), TRUE);
    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_RIGHT);
    gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
-   gtk_misc_set_alignment((GtkMisc *) label, 1.0, 0.5);
+   gtk_label_set_xalign(GTK_LABEL(label), 1.0);
+   gtk_label_set_yalign(GTK_LABEL(label), 0.5);
    gtk_box_pack_start(GTK_BOX(lbox), label, FALSE, FALSE, 0);
    gtk_widget_show(label);
 
@@ -5748,7 +5693,8 @@ static gint gapc_monitor_information_page(PGAPC_MONITOR pm, GtkWidget * notebook
    gtk_label_set_use_markup(GTK_LABEL(label), TRUE);
    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_LEFT);
    gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
-   gtk_misc_set_alignment((GtkMisc *) label, 0.0, 0.0);
+   gtk_label_set_xalign(GTK_LABEL(label), 0.0);
+   gtk_label_set_yalign(GTK_LABEL(label), 0.0);
    gtk_box_pack_start(GTK_BOX(rbox), label, TRUE, TRUE, 0);
    g_hash_table_insert(pm->pht_Widgets, g_strdup("PerformanceSummary"), label);
    gtk_widget_show(label);
@@ -5761,13 +5707,16 @@ static gint gapc_monitor_information_page(PGAPC_MONITOR pm, GtkWidget * notebook
    gtk_box_pack_end(GTK_BOX(tlbox), frame, TRUE, TRUE, 0);
    gtk_widget_show(frame);
 
-   pbox = gtk_hbox_new(FALSE, 4);
+   pbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+   gtk_box_set_homogeneous(GTK_BOX(pbox), FALSE);
    gtk_container_add(GTK_CONTAINER(frame), pbox);
    gtk_widget_show(pbox);
-   lbox = gtk_vbox_new(FALSE, 0);
+   lbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(lbox), FALSE);
    gtk_box_pack_start(GTK_BOX(pbox), lbox, FALSE, FALSE, 0);
    gtk_widget_show(lbox);
-   rbox = gtk_vbox_new(FALSE, 0);
+   rbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(rbox), FALSE);
    gtk_box_pack_end(GTK_BOX(pbox), rbox, TRUE, TRUE, 0);
    gtk_widget_show(rbox);
 
@@ -5776,7 +5725,8 @@ static gint gapc_monitor_information_page(PGAPC_MONITOR pm, GtkWidget * notebook
    gtk_label_set_use_markup(GTK_LABEL(label), TRUE);
    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_RIGHT);
    gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
-   gtk_misc_set_alignment((GtkMisc *) label, 1.0, 0.5);
+   gtk_label_set_xalign(GTK_LABEL(label), 1.0);
+   gtk_label_set_yalign(GTK_LABEL(label), 0.5);
    gtk_box_pack_start(GTK_BOX(lbox), label, FALSE, FALSE, 0);
    gtk_widget_show(label);
 
@@ -5784,7 +5734,8 @@ static gint gapc_monitor_information_page(PGAPC_MONITOR pm, GtkWidget * notebook
    gtk_label_set_use_markup(GTK_LABEL(label), TRUE);
    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_LEFT);
    gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
-   gtk_misc_set_alignment((GtkMisc *) label, 0.0, 0.0);
+   gtk_label_set_xalign(GTK_LABEL(label), 0.0);
+   gtk_label_set_yalign(GTK_LABEL(label), 0.0);
    gtk_box_pack_start(GTK_BOX(rbox), label, TRUE, TRUE, 0);
    g_hash_table_insert(pm->pht_Widgets, g_strdup("SoftwareInformation"), label);
    gtk_widget_show(label);
@@ -5797,15 +5748,16 @@ static gint gapc_monitor_information_page(PGAPC_MONITOR pm, GtkWidget * notebook
    gtk_box_pack_start(GTK_BOX(trbox), frame, TRUE, TRUE, 0);
    gtk_widget_show(frame);
 
-   gbox = gtk_vbox_new(TRUE, 2);
+   gbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
+   gtk_box_set_homogeneous(GTK_BOX(gbox), TRUE);
    gtk_container_add(GTK_CONTAINER(frame), gbox);
    gtk_widget_show(gbox);
 
-   gapc_util_barchart_create(pm, gbox, "HBar1", 10.8, "Waiting for refresh");
-   gapc_util_barchart_create(pm, gbox, "HBar2", 40.8, "Waiting for refresh");
-   gapc_util_barchart_create(pm, gbox, "HBar3", 0.8, "Waiting for refresh");
-   gapc_util_barchart_create(pm, gbox, "HBar4", 40.8, "Waiting for refresh");
-   gapc_util_barchart_create(pm, gbox, "HBar5", 10.8, "Waiting for refresh");
+   level_bar = gapc_util_level_bar_create(pm, gbox, "linev",    120.0, "Waiting for refresh");
+   level_bar = gapc_util_level_bar_create(pm, gbox, "battv",     12.0, "Waiting for refresh");
+   level_bar = gapc_util_level_bar_create(pm, gbox, "bcharge",   90.0, "Waiting for refresh");
+   level_bar = gapc_util_level_bar_create(pm, gbox, "loadpct",    5.0, "Waiting for refresh");
+   level_bar = gapc_util_level_bar_create(pm, gbox, "timeleft",  95.0, "Waiting for refresh");
 
    frame = gtk_frame_new("<b><i>Product Information</i></b>");
    gtk_frame_set_label_align(GTK_FRAME(frame), 0.1, 0.8);
@@ -5815,13 +5767,16 @@ static gint gapc_monitor_information_page(PGAPC_MONITOR pm, GtkWidget * notebook
    gtk_box_pack_end(GTK_BOX(trbox), frame, TRUE, TRUE, 0);
    gtk_widget_show(frame);
 
-   pbox = gtk_hbox_new(FALSE, 4);
+   pbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+   gtk_box_set_homogeneous(GTK_BOX(pbox), FALSE);
    gtk_container_add(GTK_CONTAINER(frame), pbox);
    gtk_widget_show(pbox);
-   lbox = gtk_vbox_new(FALSE, 0);
+   lbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(lbox), FALSE);
    gtk_box_pack_start(GTK_BOX(pbox), lbox, FALSE, FALSE, 0);
    gtk_widget_show(lbox);
-   rbox = gtk_vbox_new(FALSE, 0);
+   rbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(rbox), FALSE);
    gtk_box_pack_end(GTK_BOX(pbox), rbox, TRUE, TRUE, 0);
    gtk_widget_show(rbox);
 
@@ -5830,7 +5785,8 @@ static gint gapc_monitor_information_page(PGAPC_MONITOR pm, GtkWidget * notebook
    gtk_label_set_use_markup(GTK_LABEL(label), TRUE);
    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_RIGHT);
    gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
-   gtk_misc_set_alignment((GtkMisc *) label, 1.0, 0.5);
+   gtk_label_set_xalign(GTK_LABEL(label), 1.0);
+   gtk_label_set_yalign(GTK_LABEL(label), 0.5);
    gtk_box_pack_start(GTK_BOX(lbox), label, FALSE, FALSE, 0);
    gtk_widget_show(label);
 
@@ -5838,7 +5794,8 @@ static gint gapc_monitor_information_page(PGAPC_MONITOR pm, GtkWidget * notebook
    gtk_label_set_use_markup(GTK_LABEL(label), TRUE);
    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_LEFT);
    gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
-   gtk_misc_set_alignment((GtkMisc *) label, 0.0, 0.0);
+   gtk_label_set_xalign(GTK_LABEL(label), 0.0);
+   gtk_label_set_yalign(GTK_LABEL(label), 0.0);
    gtk_box_pack_start(GTK_BOX(rbox), label, TRUE, TRUE, 0);
    g_hash_table_insert(pm->pht_Widgets, g_strdup("ProductInformation"), label);
    gtk_widget_show(label);
@@ -5852,9 +5809,9 @@ static gint gapc_monitor_information_page(PGAPC_MONITOR pm, GtkWidget * notebook
 static gint gapc_monitor_text_report_page(PGAPC_MONITOR pm, GtkWidget * notebook,
    gchar * pchTitle, gchar * pchKey)
 {
-   PangoFontDescription *font_desc;
-   GtkWidget *scrolled, *view, *label;
-   gint i_page = 0;
+   GtkCssProvider *css_provider = NULL;
+   GtkWidget      *scrolled, *view, *label;
+   gint            i_page = 0;
 
    scrolled = gtk_scrolled_window_new(NULL, NULL);
    gtk_scrolled_window_set_shadow_type(GTK_SCROLLED_WINDOW(scrolled),
@@ -5870,9 +5827,18 @@ static gint gapc_monitor_text_report_page(PGAPC_MONITOR pm, GtkWidget * notebook
    gtk_widget_show(view);
 
    /* Change default font throughout the widget */
-   font_desc = pango_font_description_from_string("Mono 9");
-   gtk_widget_modify_font(view, font_desc);
-   pango_font_description_free(font_desc);
+   css_provider = gtk_css_provider_new();
+   gtk_css_provider_load_from_data(
+      css_provider,
+      "textview {font: 9pt 'Mono';}",
+      -1, NULL);
+
+   gtk_style_context_add_provider(
+      gtk_widget_get_style_context(view),
+      GTK_STYLE_PROVIDER(css_provider),
+      GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+
+   g_clear_object(&css_provider);
 
    gtk_text_view_set_editable(GTK_TEXT_VIEW(view), FALSE);
    gtk_text_view_set_left_margin(GTK_TEXT_VIEW(view), 5);
@@ -5884,14 +5850,13 @@ static gint gapc_monitor_text_report_page(PGAPC_MONITOR pm, GtkWidget * notebook
 
 static gint gapc_panel_glossary_page(PGAPC_CONFIG pcfg, GtkWidget * notebook)
 {
-   GtkWidget *scrolled, *label, *vbox;
-   gint i_page = 0;
-   gchar *ptext = GAPC_GLOSSARY;
-   GdkColor color;
+   GtkCssProvider *css_provider = NULL;
+   GtkWidget      *scrolled, *label, *vbox;
+   gint            i_page = 0;
+   gchar          *ptext = GAPC_GLOSSARY;
 
-   gdk_color_parse("white", &color);
-
-   vbox = gtk_vbox_new(FALSE, 0);
+   vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(vbox), FALSE);
    label = gtk_label_new("Glossary");
    i_page = gtk_notebook_append_page(GTK_NOTEBOOK(notebook), vbox, label);
    gtk_widget_show(vbox);
@@ -5908,24 +5873,36 @@ static gint gapc_panel_glossary_page(PGAPC_CONFIG pcfg, GtkWidget * notebook)
    gtk_label_set_use_markup(GTK_LABEL(label), TRUE);
    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_FILL);
    gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
+   gtk_widget_set_vexpand(label, TRUE);
 
-   gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(scrolled), label);
+   gtk_container_add(GTK_CONTAINER(scrolled), label);
    gtk_widget_show(label);
 
-   gtk_widget_modify_bg(gtk_widget_get_parent(label), GTK_STATE_NORMAL, &color);
+   css_provider = gtk_css_provider_new();
+   gtk_css_provider_load_from_data(
+      css_provider,
+      "label {background-color: white;}",
+      -1, NULL);
+
+   gtk_style_context_add_provider(
+      gtk_widget_get_style_context(label),
+      GTK_STYLE_PROVIDER(css_provider),
+      GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+
+   g_clear_object(&css_provider);
 
    return i_page;
 }
 
 static GtkWidget * gapc_color_button_new(GSettings * settings, gchar * key)
 {
-   gchar * color_string;
-   GdkColor color;
-   GtkWidget * color_button;
+   gchar     *color_string = NULL;
+   GdkRGBA    color;
+   GtkWidget *color_button = NULL;
 
    color_string = g_settings_get_string(settings, key);
-   color_button = (gdk_color_parse(color_string, &color)) ?
-      gtk_color_button_new_with_color(&color) :
+   color_button = (gdk_rgba_parse(&color, color_string)) ?
+      gtk_color_button_new_with_rgba(&color) :
       gtk_color_button_new();
    g_clear_pointer(&color_string, g_free);
    return color_button;
@@ -5940,7 +5917,8 @@ static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebo
 
    gint i_page = 0;
 
-   frame = gtk_vbox_new(FALSE, 0);
+   frame = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(frame), FALSE);
    gtk_container_set_border_width(GTK_CONTAINER(frame), 4);
    label = gtk_label_new("Graph Properties");
    i_page = gtk_notebook_append_page(GTK_NOTEBOOK(notebook), frame, label);
@@ -5948,21 +5926,26 @@ static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebo
 
   /*
    * Prepare the top color choice area */
-   hbox = gtk_hbox_new(FALSE, 2);
+   hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
+   gtk_box_set_homogeneous(GTK_BOX(hbox), FALSE);
    gtk_container_add ( GTK_CONTAINER (frame), hbox );
    gtk_widget_show(hbox);
 
   /*
    * Prepare the bottom button/message area */
-   bbox = gtk_hbox_new(FALSE, 0);
+   bbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(bbox), FALSE);
    gtk_box_pack_end ( GTK_BOX (frame), bbox, TRUE, TRUE, 2);
    gtk_widget_show(bbox);
 
-   b_undo = gtk_button_new_from_stock (GTK_STOCK_UNDO);
+   b_undo = gtk_button_new_with_label ("Undo");
    gtk_box_pack_start ( GTK_BOX (bbox), b_undo, FALSE, TRUE, 2);
    gtk_widget_show(b_undo);
-   g_signal_connect (GTK_OBJECT(b_undo), "clicked",
-                     G_CALLBACK(cb_panel_property_color_reset), pcfg);
+   g_signal_connect (
+      b_undo,
+      "clicked",
+      G_CALLBACK(cb_panel_property_color_reset),
+      pcfg);
 
    label = gtk_label_new("These values will be used during the"
                          " creation of a monitor. Disable and "
@@ -5980,11 +5963,13 @@ static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebo
    gtk_box_pack_start(GTK_BOX(hbox), s_frame, TRUE, TRUE, 0);
    gtk_widget_show(s_frame);
 
-   s_box = gtk_vbox_new(FALSE, 0);
+   s_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(s_box), FALSE);
    gtk_container_add ( GTK_CONTAINER (s_frame), s_box );
    gtk_widget_show(s_box);
 
-   pbox = gtk_hbox_new(TRUE, 4);
+   pbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+   gtk_box_set_homogeneous(GTK_BOX(pbox), TRUE);
    gtk_box_pack_start(GTK_BOX(s_box), pbox, FALSE, FALSE, 0);
       label = gtk_label_new("LINEV");
       gtk_box_pack_start(GTK_BOX(pbox), label, FALSE, FALSE, 0);
@@ -5996,7 +5981,8 @@ static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebo
       gtk_widget_show(cb_linev);
       g_hash_table_insert(pcfg->pht_Widgets, g_strdup(GAPC_COLOR_LINEV_KEY), cb_linev);
 
-   pbox = gtk_hbox_new(TRUE, 4);
+   pbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+   gtk_box_set_homogeneous(GTK_BOX(pbox), TRUE);
    gtk_box_pack_start(GTK_BOX(s_box), pbox, FALSE, FALSE, 0);
       label = gtk_label_new("LOADPCT");
       gtk_box_pack_start(GTK_BOX(pbox), label, FALSE, FALSE, 0);
@@ -6008,7 +5994,8 @@ static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebo
       gtk_widget_show(cb_loadpct);
       g_hash_table_insert(pcfg->pht_Widgets, g_strdup(GAPC_COLOR_LOADPCT_KEY), cb_loadpct);
 
-   pbox = gtk_hbox_new(TRUE, 4);
+   pbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+   gtk_box_set_homogeneous(GTK_BOX(pbox), TRUE);
    gtk_box_pack_start(GTK_BOX(s_box), pbox, FALSE, FALSE, 0);
       label = gtk_label_new("TIMELEFT");
       gtk_box_pack_start(GTK_BOX(pbox), label, FALSE, FALSE, 0);
@@ -6020,7 +6007,8 @@ static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebo
       gtk_widget_show(cb_timeleft);
       g_hash_table_insert(pcfg->pht_Widgets, g_strdup(GAPC_COLOR_TIMELEFT_KEY), cb_timeleft);
 
-   pbox = gtk_hbox_new(TRUE, 4);
+   pbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+   gtk_box_set_homogeneous(GTK_BOX(pbox), TRUE);
    gtk_box_pack_start(GTK_BOX(s_box), pbox, FALSE, FALSE, 0);
       label = gtk_label_new("BCHARGE");
       gtk_box_pack_start(GTK_BOX(pbox), label, FALSE, FALSE, 0);
@@ -6032,7 +6020,8 @@ static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebo
       gtk_widget_show(cb_bcharge);
       g_hash_table_insert(pcfg->pht_Widgets, g_strdup(GAPC_COLOR_BCHARGE_KEY), cb_bcharge);
 
-   pbox = gtk_hbox_new(TRUE, 4);
+   pbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+   gtk_box_set_homogeneous(GTK_BOX(pbox), TRUE);
    gtk_box_pack_start(GTK_BOX(s_box), pbox, FALSE, FALSE, 0);
       label = gtk_label_new("BATTV");
       gtk_box_pack_start(GTK_BOX(pbox), label, FALSE, FALSE, 0);
@@ -6050,11 +6039,13 @@ static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebo
    gtk_box_pack_start(GTK_BOX(hbox), w_frame, TRUE, TRUE, 0);
    gtk_widget_show(w_frame);
 
-   w_box = gtk_vbox_new(FALSE, 0);
+   w_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(w_box), FALSE);
    gtk_container_add ( GTK_CONTAINER (w_frame), w_box );
    gtk_widget_show(w_box);
 
-   pbox = gtk_hbox_new(TRUE, 4);
+   pbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+   gtk_box_set_homogeneous(GTK_BOX(pbox), TRUE);
    gtk_box_pack_start(GTK_BOX(w_box), pbox, FALSE, FALSE, 0);
       label = gtk_label_new("Window Background");
       gtk_box_pack_start(GTK_BOX(pbox), label, FALSE, FALSE, 0);
@@ -6066,7 +6057,8 @@ static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebo
       gtk_widget_show(cb_window);
       g_hash_table_insert(pcfg->pht_Widgets, g_strdup(GAPC_COLOR_WINDOW_KEY), cb_window);
 
-   pbox = gtk_hbox_new(TRUE, 4);
+   pbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+   gtk_box_set_homogeneous(GTK_BOX(pbox), TRUE);
    gtk_box_pack_start(GTK_BOX(w_box), pbox, FALSE, FALSE, 0);
       label = gtk_label_new("Chart Background");
       gtk_box_pack_start(GTK_BOX(pbox), label, FALSE, FALSE, 0);
@@ -6078,7 +6070,8 @@ static gint gapc_panel_graph_property_page(PGAPC_CONFIG pcfg, GtkWidget * notebo
       gtk_widget_show(cb_chart);
       g_hash_table_insert(pcfg->pht_Widgets, g_strdup(GAPC_COLOR_CHART_KEY), cb_chart);
 
-   pbox = gtk_hbox_new(TRUE, 4);
+   pbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+   gtk_box_set_homogeneous(GTK_BOX(pbox), TRUE);
    gtk_box_pack_start(GTK_BOX(w_box), pbox, FALSE, FALSE, 0);
       label = gtk_label_new("Title Texts");
       gtk_box_pack_start(GTK_BOX(pbox), label, FALSE, FALSE, 0);
@@ -6147,7 +6140,7 @@ static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, guint i_monit
       GAPC_PREFS_MONITOR, &z_monitor, -1);
 
    pixbuf = pm->my_icons[GAPC_ICON_DEFAULT];
-   pm->gm_update = g_mutex_new();
+   g_mutex_init(&pm->gm_update);
    monitor_settings_key = g_strdup_printf(GAPC_MONITOR_NAME_OUTPUT_FORMAT, i_monitor);
    pm->monitor_settings = g_hash_table_lookup(
       pcfg->pht_Monitor_Settings,
@@ -6164,8 +6157,10 @@ static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, guint i_monit
    g_return_val_if_fail(pm->q_network != NULL, NULL);
 
    pm->b_thread_stop = FALSE;
-   pm->tid_thread_qwork =
-      g_thread_create((GThreadFunc) gapc_net_thread_qwork, pm, TRUE, NULL);
+   pm->tid_thread_qwork = g_thread_new(
+      "net-comm",
+      (GThreadFunc)gapc_net_thread_qwork,
+      pm);
 
    /*
     * Create the top level window for the notebook to be packed into.*/
@@ -6186,24 +6181,26 @@ static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, guint i_monit
    g_snprintf(pm->ch_title_info, GAPC_MAX_TEXT, "%s\n<b><i>{%s}</i></b>",
       GAPC_WINDOW_TITLE, pm->pch_host);
 
-   lbox = gtk_vbox_new(FALSE, 2);
+   lbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
+   gtk_box_set_homogeneous(GTK_BOX(lbox), FALSE);
    gtk_container_add(GTK_CONTAINER(window), lbox);
    gtk_widget_show(lbox);
 
 /* */
 
    /* Notebook Box  */
-   bbox = gtk_vbox_new(FALSE, 0);
+   bbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(bbox), FALSE);
    gtk_container_set_border_width(GTK_CONTAINER(bbox), 6);
    gtk_box_pack_start(GTK_BOX(lbox), bbox, TRUE, TRUE, 2);
    gtk_widget_show(bbox);
-   nbox = gtk_hbox_new(TRUE, 0);
+   nbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(nbox), TRUE);
    gtk_box_pack_start(GTK_BOX(bbox), nbox, TRUE, TRUE, 0);
    gtk_widget_show(nbox);
 
    /* create the status bar */
    sbar = gtk_statusbar_new();
-   gtk_statusbar_set_has_resize_grip(GTK_STATUSBAR(sbar), FALSE);
    g_hash_table_insert(pm->pht_Widgets, g_strdup("StatusBar"), sbar);
    gtk_box_pack_end(GTK_BOX(lbox), sbar, FALSE, TRUE, 0);
    gtk_widget_show(sbar);
@@ -6211,11 +6208,12 @@ static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, guint i_monit
       gtk_statusbar_get_context_id(GTK_STATUSBAR(sbar), "Informational");
 
    /* buttons Box  */
-   bbox = gtk_hbox_new(FALSE, 0);
+   bbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+   gtk_box_set_homogeneous(GTK_BOX(bbox), FALSE);
    gtk_container_set_border_width(GTK_CONTAINER(bbox), 0);
    gtk_box_pack_end(GTK_BOX(lbox), bbox, FALSE, FALSE, 0);
    gtk_widget_show(bbox);
-   box = gtk_hbutton_box_new();
+   box = gtk_button_box_new(GTK_ORIENTATION_HORIZONTAL);
    gtk_button_box_set_layout (GTK_BUTTON_BOX (box), GTK_BUTTONBOX_SPREAD);
    gtk_container_set_border_width(GTK_CONTAINER(box), 4);
    gtk_box_pack_end(GTK_BOX(bbox), box, TRUE, TRUE, 0);
@@ -6244,7 +6242,7 @@ static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, guint i_monit
    g_hash_table_insert(pm->pht_Widgets, g_strdup("TitleStatus"), label);
 
    /* refresh Control button */
-   button = gtk_button_new_from_stock(GTK_STOCK_REFRESH);
+   button = gtk_button_new_with_label("Refresh");
    gtk_widget_set_can_default(button, TRUE);
    g_signal_connect(button, "clicked",
       G_CALLBACK(cb_monitor_interface_button_refresh), pm);
@@ -6253,7 +6251,7 @@ static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, guint i_monit
    gtk_widget_grab_default(button);
 
 /*
-   button = gtk_button_new_from_stock(GTK_STOCK_CLOSE);
+   button = gtk_button_new_with_label("Close");
    g_signal_connect(button, "clicked",
       G_CALLBACK(cb_monitor_interface_button_close), pm);
    gtk_box_pack_end(GTK_BOX(box), button, TRUE, TRUE, 0);
@@ -6274,12 +6272,12 @@ static GtkWidget *gapc_monitor_interface_create(PGAPC_CONFIG pcfg, guint i_monit
 
    pm->menu = g_object_ref_sink(gtk_menu_new());
    menu = pm->menu;
-   menu_item = gtk_image_menu_item_new_from_stock(GTK_STOCK_JUMP_TO, NULL);
+   menu_item = gtk_menu_item_new_with_label("Jump to");
    g_signal_connect(G_OBJECT(menu_item), "activate",
       G_CALLBACK(cb_util_popup_menu_response_jumpto), pm);
    gtk_menu_shell_append(GTK_MENU_SHELL(menu), menu_item);
    gtk_widget_show(menu_item);
-   menu_item = gtk_image_menu_item_new_from_stock(GTK_STOCK_QUIT, NULL);
+   menu_item = gtk_menu_item_new_with_label("Quit");
    g_signal_connect(G_OBJECT(menu_item), "activate",
       G_CALLBACK(cb_util_popup_menu_response_exit), pm);
    gtk_menu_shell_append(GTK_MENU_SHELL(menu), menu_item);
@@ -6349,13 +6347,8 @@ extern int main(int argc, char *argv[])
    GtkWidget *window = NULL;
 
    /*
-    * Initialize GLib thread support, and GTK
+    * Initialize GTK
     */
-   g_type_init();
-   g_thread_init(NULL);
-
-   gdk_threads_init();
-
    gtk_init(&argc, &argv);
 
    pcfg = g_new0(GAPC_CONFIG, 1);
@@ -6386,10 +6379,7 @@ extern int main(int argc, char *argv[])
    /*
     * enter the GTK main loop
     */
-   gdk_threads_enter();
    gtk_main();
-   gdk_flush();
-   gdk_threads_leave();
 
    return (0);
 }
